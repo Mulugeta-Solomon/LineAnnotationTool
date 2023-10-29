@@ -225,28 +225,25 @@ class LineAnnotationTool(QMainWindow):
             # Getting a list of all the image files in the selected folder
             try:
                 self.image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
-                print(f"Detected images: {self.image_files}")
+                #print(f"Detected images: {self.image_files}")
                 if self.image_files:
-                    #first_image_path = os.path.join(folder_name, image_files[0])
-                    #pixmap = QPixmap(first_image_path)
-                    #self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
-                    #self.imageName.setText(image_files[0])
                     self.current_image_index = 0
                     self.show_image(self.current_image_index)
+                    self.progressBarImage.setMaximum(len(self.image_files))
+                    self.update_image_progress()
                 else:
                     self.imageViewer.setText("No image files in the selected folder!")
-            except Exception as e:
-                self.imageViewer.setText(f"Error: {e}")
-                print(f"Error: {e}")
+            except Exception as err:
+                self.imageViewer.setText(f"Error: {err}")
+                print(f"Error: {err}")
         else:
             self.imageViewer.setText("Please select a folder first!")
 
     def show_image(self, index):
-        #Display the image at the given index
         if 0 <= index < len(self.image_files):
             folder_name = self.folderPath.text()
             image_path = os.path.join(folder_name, self.image_files[index])
-            print(f"Loading image from: {image_path}")
+            #print(f"Loading image from: {image_path}")
             pixmap = QPixmap(image_path)
             self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
             self.imageName.setText(self.image_files[index])
@@ -258,6 +255,7 @@ class LineAnnotationTool(QMainWindow):
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
             self.show_image(self.current_image_index)
+            self.update_image_progress()
         else:
             self.imageViewer.setText("This is the last image!")
 
@@ -266,8 +264,14 @@ class LineAnnotationTool(QMainWindow):
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.show_image(self.current_image_index)
+            self.update_image_progress()
         else:
             self.imageViewer.setText("This is the first image!")
+
+    def update_image_progress(self):
+        self.progressBarImage.setValue(self.current_image_index + 1)
+        self.progImage.setText(f"{self.current_image_index + 1} of {len(self.image_files)} images annotated")
+
 
 
 
