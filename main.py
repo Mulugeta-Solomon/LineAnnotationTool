@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar
 from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog
+import os
 
 
 class LineAnnotationTool(QMainWindow):
