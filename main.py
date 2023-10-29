@@ -5,6 +5,8 @@ import sys
 from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar, QComboBox, QWidget, QHBoxLayout, QFrame, QLabel, QPushButton
 from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject
 from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QFileDialog
+
 
 class LineAnnotationTool(QMainWindow):
 
@@ -164,6 +166,13 @@ class LineAnnotationTool(QMainWindow):
         self.horizontalLayout.addWidget(self.frame_2)
         self.setCentralWidget(self.centralwidget)
 
+        self.selectFile.setObjectName("selectFile")
+        self.selectFile.clicked.connect(self.select_folder)
+
+        self.loadImage.setObjectName("loadImage")
+        self.loadImage.clicked.connect(self.load_image)
+
+
         self.retranslateUi(MainWindow)
         QMetaObject.connectSlotsByName(MainWindow)
 
@@ -191,6 +200,28 @@ class LineAnnotationTool(QMainWindow):
         self.nextImage.setText(_translate("LineAnnotationTool", "Next"))
         self.buttonsforLine.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button For Line </span></p></body></html>"))
         self.buttonsforImage.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button for Image</span></p></body></html>"))
+
+    def select_folder(self):
+        folder_name = QFileDialog.getExistingDirectory(self, "Select a Folder")
+        if folder_name:
+            self.folderPath.setText(folder_name)
+            # Set default file path as empty when a new folder is selected
+            self.filePath.setText("No File Selected")
+
+    def load_image(self):
+        folder_name = self.folderPath.text()
+        if folder_name not in ["", "No Folder Selected"]:
+            # Getting a list of all the image files in the selected folder
+            image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
+            if image_files:
+                first_image_path = os.path.join(folder_name, image_files[0])
+                pixmap = QPixmap(first_image_path)
+                self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+                self.imageName.setText(image_files[0])
+            else:
+                self.imageViewer.setText("No image files in the selected folder!")
+        else:
+            self.imageViewer.setText("Please select a folder first!")
 
 SCALE_FACTOR = 1.5
 # Scaling function for QRect values
