@@ -169,11 +169,19 @@ class LineAnnotationTool(QMainWindow):
         self.horizontalLayout.addWidget(self.frame_2)
         self.setCentralWidget(self.centralwidget)
 
+        # Connect the functionality
         self.selectFolder.setObjectName("selectFile")
         self.selectFolder.clicked.connect(self.select_folder)
 
         self.loadImage.setObjectName("loadImage")
         self.loadImage.clicked.connect(self.load_image)
+
+        self.nextImage.setObjectName("nextImage")
+        self.nextImage.clicked.connect(self.next_image)
+
+        self.PreviousImage.setObjectName("PreviousImage")
+        self.PreviousImage.clicked.connect(self.previous_image)
+
 
 
         self.retranslateUi(MainWindow)
@@ -215,24 +223,30 @@ class LineAnnotationTool(QMainWindow):
         folder_name = self.folderPath.text()
         if folder_name not in ["", "No Folder Selected"]:
             # Getting a list of all the image files in the selected folder
-            image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
-            if image_files:
-                #first_image_path = os.path.join(folder_name, image_files[0])
-                #pixmap = QPixmap(first_image_path)
-                #self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
-                #self.imageName.setText(image_files[0])
-                self.current_image_index = 0
-                self.show_image(self.current_image_index)
-            else:
-                self.imageViewer.setText("No image files in the selected folder!")
+            try:
+                self.image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
+                print(f"Detected images: {self.image_files}")
+                if self.image_files:
+                    #first_image_path = os.path.join(folder_name, image_files[0])
+                    #pixmap = QPixmap(first_image_path)
+                    #self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+                    #self.imageName.setText(image_files[0])
+                    self.current_image_index = 0
+                    self.show_image(self.current_image_index)
+                else:
+                    self.imageViewer.setText("No image files in the selected folder!")
+            except Exception as e:
+                self.imageViewer.setText(f"Error: {e}")
+                print(f"Error: {e}")
         else:
             self.imageViewer.setText("Please select a folder first!")
 
     def show_image(self, index):
-        """Display the image at the given index."""
+        #Display the image at the given index
         if 0 <= index < len(self.image_files):
             folder_name = self.folderPath.text()
             image_path = os.path.join(folder_name, self.image_files[index])
+            print(f"Loading image from: {image_path}")
             pixmap = QPixmap(image_path)
             self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
             self.imageName.setText(self.image_files[index])
@@ -240,20 +254,22 @@ class LineAnnotationTool(QMainWindow):
             self.imageViewer.setText("No image to display!")
 
     def next_image(self):
-        """Load the next image in the directory."""
+        #Load the next image in the directory
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
-            self.show_image_by_index(self.current_image_index)
+            self.show_image(self.current_image_index)
         else:
             self.imageViewer.setText("This is the last image!")
 
     def previous_image(self):
-        """Load the previous image in the directory."""
+        #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
-            self.show_image_by_index(self.current_image_index)
+            self.show_image(self.current_image_index)
         else:
             self.imageViewer.setText("This is the first image!")
+
+
 
 SCALE_FACTOR = 1.5
 # Scaling function for QRect values
