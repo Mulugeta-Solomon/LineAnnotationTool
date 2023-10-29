@@ -13,6 +13,8 @@ class LineAnnotationTool(QMainWindow):
 
     def __init__(self):
         super(LineAnnotationTool, self).__init__()
+        self.image_files = []
+        self.current_image_index = -1
         self.initUI(self)
 
     def initUI(self, MainWindow):
@@ -161,14 +163,14 @@ class LineAnnotationTool(QMainWindow):
         self.buttonsforLine.setObjectName("buttonsforLine")
         
         self.buttonsforImage = QLabel(self.frame_4)
-        self.buttonsforImage.setGeometry(scaleRect(QRect(220, 440, 101, 20)))
+        self.buttonsforImage.setGeometry(scaleRect(QRect(220, 440, 104, 20)))
         self.buttonsforImage.setObjectName("buttonsforImage")
         
         self.horizontalLayout.addWidget(self.frame_2)
         self.setCentralWidget(self.centralwidget)
 
-        self.selectFile.setObjectName("selectFile")
-        self.selectFile.clicked.connect(self.select_folder)
+        self.selectFolder.setObjectName("selectFile")
+        self.selectFolder.clicked.connect(self.select_folder)
 
         self.loadImage.setObjectName("loadImage")
         self.loadImage.clicked.connect(self.load_image)
@@ -215,14 +217,43 @@ class LineAnnotationTool(QMainWindow):
             # Getting a list of all the image files in the selected folder
             image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
             if image_files:
-                first_image_path = os.path.join(folder_name, image_files[0])
-                pixmap = QPixmap(first_image_path)
-                self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
-                self.imageName.setText(image_files[0])
+                #first_image_path = os.path.join(folder_name, image_files[0])
+                #pixmap = QPixmap(first_image_path)
+                #self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+                #self.imageName.setText(image_files[0])
+                self.current_image_index = 0
+                self.show_image(self.current_image_index)
             else:
                 self.imageViewer.setText("No image files in the selected folder!")
         else:
             self.imageViewer.setText("Please select a folder first!")
+
+    def show_image(self, index):
+        """Display the image at the given index."""
+        if 0 <= index < len(self.image_files):
+            folder_name = self.folderPath.text()
+            image_path = os.path.join(folder_name, self.image_files[index])
+            pixmap = QPixmap(image_path)
+            self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+            self.imageName.setText(self.image_files[index])
+        else:
+            self.imageViewer.setText("No image to display!")
+
+    def next_image(self):
+        """Load the next image in the directory."""
+        if self.current_image_index < len(self.image_files) - 1:
+            self.current_image_index += 1
+            self.show_image_by_index(self.current_image_index)
+        else:
+            self.imageViewer.setText("This is the last image!")
+
+    def previous_image(self):
+        """Load the previous image in the directory."""
+        if self.current_image_index > 0:
+            self.current_image_index -= 1
+            self.show_image_by_index(self.current_image_index)
+        else:
+            self.imageViewer.setText("This is the first image!")
 
 SCALE_FACTOR = 1.5
 # Scaling function for QRect values
