@@ -291,12 +291,24 @@ class LineAnnotationTool(QMainWindow):
     def save_annotation(self):
         current_image_name = self.imageName.text()  # current image name
         selected_annotation = self.lineAnndropDown.currentText()
-        if selected_annotation and current_image_name in self.lineAnnotations:
-            if selected_annotation not in self.lineAnnotations[current_image_name]:
-                self.lineAnnotations[current_image_name].append(selected_annotation)
-            self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
+
+         # Fetch the line data for the current image from the JSON data
+        if hasattr(self, 'json_data') and self.json_data:
+            image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
+            if image_data:
+                line_count = len(image_data[0]['edges_positive'])
+            else:
+                return print("Error: Image data not found in JSON!")
         else:
-            # If the annotation wasn't saved, disable the nextLine button
+            return print("Error: JSON data not loaded!")
+        
+
+        if selected_annotation and current_image_name in self.lineAnnotations:
+             if len(self.lineAnnotations[current_image_name]) < line_count:
+                self.lineAnnotations[current_image_name].append(selected_annotation)
+                self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
+        else:
+            # If we've reached the maximum number of annotations for this image
             self.nextLine.setEnabled(False)
 
     def check_annotation_completeness(self): ## error handling
@@ -469,6 +481,13 @@ class LineAnnotationTool(QMainWindow):
             image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name][0]
             if self.current_line_index < len(image_data['edges_positive']) - 1:
                 self.current_line_index += 1
+                    # Check if you're at the end of the lines for the current image
+                if self.currentLineIndex == len(self.lineAnnotations[self.imageName.text()]):
+                    self.nextLine.setEnabled(False)
+                else:
+                    # Update the dropdown to reflect the next line's annotation, if it exists
+                    self.lineAnndropDown.setCurrentText(self.lineAnnotations[self.imageName.text()][self.currentLineIndex])
+                self.previousLine.setEnabled(True) 
                 self.load_line()
                 self.lineProgressBar()
         #else: 
@@ -479,8 +498,14 @@ class LineAnnotationTool(QMainWindow):
             current_image_name = self.imageName.text()
             if current_image_name in self.lineAnnotations and self.lineAnnotations[current_image_name]:
                 self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
-            if self.current_line_index > 0:
+            if self.current_line_index >= 0:
                 self.current_line_index -= 1
+                if self.currentLineIndex < 0:
+                    self.previousLine.setEnabled(False)
+                else:
+                    # Update the dropdown to reflect the previous line's annotation
+                    self.lineAnndropDown.setCurrentText(self.lineAnnotations[self.imageName.text()][self.currentLineIndex])
+                self.nextLine.setEnabled(True)
                 self.load_line()
                 self.lineProgressBar()
     
