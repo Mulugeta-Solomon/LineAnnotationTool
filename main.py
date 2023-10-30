@@ -158,37 +158,37 @@ class LineAnnotationTool(QMainWindow):
         self.imageName.setObjectName("imageName")
         
         self.frame_4 = QFrame(self.frame_2)
-        self.frame_4.setGeometry(scaleRect(QRect(0, 50, 491, 501)))
+        self.frame_4.setGeometry(scaleRect(QRect(0, 50, 491, 520)))
         self.frame_4.setFrameShape(QFrame.StyledPanel)
         self.frame_4.setFrameShadow(QFrame.Raised)
         self.frame_4.setObjectName("frame_4")
         
         self.imageViewer = QLabel(self.frame_4)
-        self.imageViewer.setGeometry(scaleRect(QRect(0, 0, 481, 361)))
+        self.imageViewer.setGeometry(scaleRect(QRect(0, 0, 500, 400)))
         self.imageViewer.setObjectName("imageViewer")
         
         self.previousLine = QPushButton(self.frame_4)
-        self.previousLine.setGeometry(scaleRect(QRect(100, 400, 91, 31)))
+        self.previousLine.setGeometry(scaleRect(QRect(100, 420, 91, 31)))
         self.previousLine.setObjectName("previousLine")
         
         self.nextLine = QPushButton(self.frame_4)
-        self.nextLine.setGeometry(scaleRect(QRect(330, 400, 91, 31)))
+        self.nextLine.setGeometry(scaleRect(QRect(330, 420, 91, 31)))
         self.nextLine.setObjectName("nextLine")
         
         self.PreviousImage = QPushButton(self.frame_4)
-        self.PreviousImage.setGeometry(scaleRect(QRect(100, 460, 91, 31)))
+        self.PreviousImage.setGeometry(scaleRect(QRect(100, 480, 91, 31)))
         self.PreviousImage.setObjectName("PreviousImage")
         
         self.nextImage = QPushButton(self.frame_4)
-        self.nextImage.setGeometry(scaleRect(QRect(330, 460, 91, 31)))
+        self.nextImage.setGeometry(scaleRect(QRect(330, 480, 91, 31)))
         self.nextImage.setObjectName("nextImage")
         
         self.buttonsforLine = QLabel(self.frame_4)
-        self.buttonsforLine.setGeometry(scaleRect(QRect(220, 370, 101, 31)))
+        self.buttonsforLine.setGeometry(scaleRect(QRect(220, 400, 101, 31)))
         self.buttonsforLine.setObjectName("buttonsforLine")
         
         self.buttonsforImage = QLabel(self.frame_4)
-        self.buttonsforImage.setGeometry(scaleRect(QRect(220, 440, 104, 20)))
+        self.buttonsforImage.setGeometry(scaleRect(QRect(220, 460, 104, 20)))
         self.buttonsforImage.setObjectName("buttonsforImage")
         
         self.horizontalLayout.addWidget(self.frame_2)
@@ -435,7 +435,7 @@ class LineAnnotationTool(QMainWindow):
         
 
 
-SCALE_FACTOR = 1.5
+SCALE_FACTOR = 2
 # Scaling function for QRect values
 def scaleRect(rect):
     return QRect(int(rect.x() * SCALE_FACTOR),
