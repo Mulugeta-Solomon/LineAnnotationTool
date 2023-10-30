@@ -2,11 +2,13 @@
 
 
 import sys
-from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar, QComboBox, QWidget, QHBoxLayout, QFrame, QLabel, QPushButton
-from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QFileDialog
 import os
+import json
+from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar, QComboBox, QWidget, QHBoxLayout, QFrame, QLabel, QPushButton
+from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject, QPointF
+from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
+from PyQt5.QtWidgets import QFileDialog
+
 
 
 class LineAnnotationTool(QMainWindow):
@@ -15,6 +17,8 @@ class LineAnnotationTool(QMainWindow):
         super(LineAnnotationTool, self).__init__()
         self.image_files = []
         self.current_image_index = -1
+        self.current_line_index = 0
+        self.json_data = None
         self.initUI(self)
 
     def initUI(self, MainWindow):
@@ -185,6 +189,13 @@ class LineAnnotationTool(QMainWindow):
         self.selectFile.setObjectName("selectFile")
         self.selectFile.clicked.connect(self.select_file)
 
+        self.loadLine.setObjectName("loadLine")
+        self.loadLine.clicked.connect(self.load_line)
+
+        self.nextLine.clicked.connect(self.next_line)
+        self.previousLine.clicked.connect(self.previous_line)
+
+
 
 
 
@@ -257,6 +268,8 @@ class LineAnnotationTool(QMainWindow):
         #Load the next image in the directory
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
+            self.current_line_index = 0
+            self.load_line()
             self.show_image(self.current_image_index)
             self.imageProgressbar()
         else:
@@ -266,6 +279,8 @@ class LineAnnotationTool(QMainWindow):
         #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
+            self.current_line_index = 0
+            self.load_line()
             self.show_image(self.current_image_index)
             self.imageProgressbar()
         else:
@@ -276,15 +291,88 @@ class LineAnnotationTool(QMainWindow):
         self.progImage.setText(f"{self.current_image_index + 1} of {len(self.image_files)} images annotated")
 
     def select_file(self):
-        # Display a File Dialog to select a JSON file
-        file_name, _ = QFileDialog.getOpenFileName(self, "Select a JSON File", "", "JSON Files (*.json);;All Files (*)")
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Select the JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
         if file_name:
             self.filePath.setText(file_name)
+            self.json_data = self.load_json(file_name)
         else:
-            self.filePath.setText("No File Selected")
+            self.filePath.setText("File not Selected")
+    
+    def load_json(self, file_name):
+        with open(file_name, 'r') as file:
+            data = json.load(file)
+        return data
+    
+    def load_line(self):
+        # This method will extract the required info for the current image and draw the lines.
+        current_image_name = self.image_files[self.current_image_index]
+        if not current_image_name or not hasattr(self, 'json_data') or not self.json_data:
+            return self.filePath.setText("File not Selected")
+        
+       
+        image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
+        if not image_data:
+            return self.filePath.setText("File not Selected")
+        
+        image_data = image_data[0]
+        #if self.current_line_index >= len(image_data['edges_positive']):
+         #   self.current_line_index = 0
+
+        junctions = image_data['junctions']
+        #edges = [image_data['edges_positive'][:self.current_line_index+1]]
+        edges = image_data['edges_positive']
 
 
+        # Draw lines on the current image
+        folder_name = self.folderPath.text()
+        image_path = os.path.join(folder_name, current_image_name)
+        pixmap = QPixmap(image_path)
+        painter = QPainter(pixmap)
+        
+        # Define line color and properties
+        pen = QPen(QColor(255, 165, 0))
+        pen.setWidth(2)
+        painter.setPen(pen)
 
+        # Draw lines between junctions as per the edges
+        for index, edge in enumerate(edges):
+            if index > self.current_line_index:
+                break
+            start_point, end_point = junctions[edge[0]], junctions[edge[1]]
+            p1 = QPointF(start_point[0], start_point[1])
+            p2 = QPointF(end_point[0], end_point[1])
+            painter.drawLine(p1, p2)
+            #painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
+        
+        # Set the color for the junction points
+        pen = QPen(QColor(52, 255, 236))  # RGB for blue color
+        brush = QBrush(QColor(52, 255, 236)) 
+        painter.setPen(pen)
+        painter.setBrush(brush)
+        radius = 2  # Set the radius for the circle
+
+        # Draw the junction points
+        for junction in junctions:
+            painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
+
+
+        painter.end()
+
+        # Display the image with the overlayed lines
+        self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+    
+    def next_line(self):
+        if hasattr(self, 'json_data') and self.json_data:
+            if self.current_line_index < len(self.json_data[0]['edges_positive']) - 1:
+                self.current_line_index += 1
+                self.load_line()
+
+    def previous_line(self):
+        if hasattr(self, 'json_data') and self.json_data:
+            if self.current_line_index > 0:
+                self.current_line_index -= 1
+                self.load_line()
 
 
 SCALE_FACTOR = 1.5
