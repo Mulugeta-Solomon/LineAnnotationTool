@@ -255,6 +255,8 @@ class LineAnnotationTool(QMainWindow):
             self.filePath.setText("No File Selected")
 
     def load_image(self):
+        self.nextLine.setEnabled(False)
+        self.previousLine.setEnabled(False)
         folder_name = self.folderPath.text()
         if folder_name not in ["", "No Folder Selected"]:
             # Getting a list of all the image files in the selected folder
@@ -295,6 +297,9 @@ class LineAnnotationTool(QMainWindow):
             self.imageProgressBar()
         else:
             self.imageViewer.setText("This is the last image!")
+        
+        self.nextLine.setEnabled(False)
+        self.previousLine.setEnabled(False)
 
     def previous_image(self):
         #Load the previous image in the directory
@@ -306,6 +311,9 @@ class LineAnnotationTool(QMainWindow):
             self.imageProgressBar()
         else:
             self.imageViewer.setText("This is the first image!")
+        
+        self.nextLine.setEnabled(False)
+        self.previousLine.setEnabled(False)
 
     def imageProgressBar(self):
         self.progressBarImage.setValue(self.current_image_index + 1)
@@ -397,6 +405,8 @@ class LineAnnotationTool(QMainWindow):
         # Display the image with the overlayed lines
         self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
         self.lineProgressBar()
+        self.nextLine.setEnabled(True)
+        self.previousLine.setEnabled(True)
     
     def next_line(self):
         if hasattr(self, 'json_data') and self.json_data:
@@ -406,6 +416,8 @@ class LineAnnotationTool(QMainWindow):
                 self.current_line_index += 1
                 self.load_line()
                 self.lineProgressBar()
+        #else: 
+            #return 
 
     def previous_line(self):
         if hasattr(self, 'json_data') and self.json_data:
