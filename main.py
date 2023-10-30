@@ -220,11 +220,6 @@ class LineAnnotationTool(QMainWindow):
         self.lineAnndropDown.activated.connect(self.save_annotation)
         self.lineAnndropDown.currentIndexChanged.connect(self.onAnnotationSelected)
 
-
-
-
-
-
         self.retranslateUi(MainWindow)
         QMetaObject.connectSlotsByName(MainWindow)
 
@@ -273,6 +268,15 @@ class LineAnnotationTool(QMainWindow):
         self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(False)
         folder_name = self.folderPath.text()
+        self.annotation_colors = {
+            "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
+            "Wall Edge (WE)": QColor(0, 255, 0),  # Green # Any edge (vertical or horizontal) found on walls
+            "Horizontal Lower Edge (HLE)": QColor(0, 0, 255),  # Blue # Floors and Foundation Edges
+            "Door Edge (DE)": QColor(255, 255, 0),  # Yellow  # Edges around doors, both interior and exterior
+            "Window Edge (WndE)": QColor(255, 0, 255),  # Magenta  # Edges around windows
+            "Miscellaneous Objects (MO)": QColor(0, 255, 255)   # Cyan # Any object or covered by the above categories
+        }
+
         
         if folder_name not in ["", "No Folder Selected"]:
             # Getting a list of all the image files in the selected folder
@@ -312,6 +316,7 @@ class LineAnnotationTool(QMainWindow):
         if selected_annotation and current_image_name in self.lineAnnotations:
              if len(self.lineAnnotations[current_image_name]) < line_count:
                 self.lineAnnotations[current_image_name].append(selected_annotation)
+                self.load_line()
                 self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
         else:
             # If we've reached the maximum number of annotations for this image
@@ -419,7 +424,9 @@ class LineAnnotationTool(QMainWindow):
         painter = QPainter(pixmap)
         
         # Define line color and properties
-        pen = QPen(QColor(255, 165, 0))
+        annotation_label = self.lineAnnotations[self.imageName.text()][self.current_line_index] if self.current_line_index < len(self.lineAnnotations[self.imageName.text()]) else None
+        color = self.annotation_colors.get(annotation_label, QColor(255, 165, 0))
+        pen = QPen(color)
         pen.setWidth(2)
         painter.setPen(pen)
 
