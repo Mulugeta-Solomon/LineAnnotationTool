@@ -170,7 +170,7 @@ class LineAnnotationTool(QMainWindow):
         self.setCentralWidget(self.centralwidget)
 
         # Connect the functionality
-        self.selectFolder.setObjectName("selectFile")
+        self.selectFolder.setObjectName("selectFolder")
         self.selectFolder.clicked.connect(self.select_folder)
 
         self.loadImage.setObjectName("loadImage")
@@ -181,6 +181,10 @@ class LineAnnotationTool(QMainWindow):
 
         self.PreviousImage.setObjectName("PreviousImage")
         self.PreviousImage.clicked.connect(self.previous_image)
+
+        self.selectFile.setObjectName("selectFile")
+        self.selectFile.clicked.connect(self.select_file)
+
 
 
 
@@ -216,7 +220,6 @@ class LineAnnotationTool(QMainWindow):
         folder_name = QFileDialog.getExistingDirectory(self, "Select a Folder")
         if folder_name:
             self.folderPath.setText(folder_name)
-            # Set default file path as empty when a new folder is selected
             self.filePath.setText("No File Selected")
 
     def load_image(self):
@@ -230,7 +233,7 @@ class LineAnnotationTool(QMainWindow):
                     self.current_image_index = 0
                     self.show_image(self.current_image_index)
                     self.progressBarImage.setMaximum(len(self.image_files))
-                    self.update_image_progress()
+                    self.imageProgressbar()
                 else:
                     self.imageViewer.setText("No image files in the selected folder!")
             except Exception as err:
@@ -255,7 +258,7 @@ class LineAnnotationTool(QMainWindow):
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
             self.show_image(self.current_image_index)
-            self.update_image_progress()
+            self.imageProgressbar()
         else:
             self.imageViewer.setText("This is the last image!")
 
@@ -264,13 +267,22 @@ class LineAnnotationTool(QMainWindow):
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.show_image(self.current_image_index)
-            self.update_image_progress()
+            self.imageProgressbar()
         else:
             self.imageViewer.setText("This is the first image!")
 
-    def update_image_progress(self):
+    def imageProgressbar(self):
         self.progressBarImage.setValue(self.current_image_index + 1)
         self.progImage.setText(f"{self.current_image_index + 1} of {len(self.image_files)} images annotated")
+
+    def select_file(self):
+        # Display a File Dialog to select a JSON file
+        file_name, _ = QFileDialog.getOpenFileName(self, "Select a JSON File", "", "JSON Files (*.json);;All Files (*)")
+        if file_name:
+            self.filePath.setText(file_name)
+        else:
+            self.filePath.setText("No File Selected")
+
 
 
 
