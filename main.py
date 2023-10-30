@@ -19,6 +19,7 @@ class LineAnnotationTool(QMainWindow):
         self.current_image_index = -1
         self.current_line_index = 0
         self.json_data = None
+        self.lineAnnotations = {}
         self.initUI(self)
 
     def initUI(self, MainWindow):
@@ -216,6 +217,10 @@ class LineAnnotationTool(QMainWindow):
         self.nextLine.clicked.connect(self.next_line)
         self.previousLine.clicked.connect(self.previous_line)
 
+        self.lineAnndropDown.activated.connect(self.save_annotation)
+        self.lineAnndropDown.currentIndexChanged.connect(self.onAnnotationSelected)
+
+
 
 
 
@@ -270,11 +275,58 @@ class LineAnnotationTool(QMainWindow):
                     self.imageProgressBar()
                 else:
                     self.imageViewer.setText("No image files in the selected folder!")
+                for image in self.image_files:
+                    if image not in self.lineAnnotations:
+                        self.lineAnnotations[image] = []
             except Exception as err:
                 self.imageViewer.setText(f"Error: {err}")
                 print(f"Error: {err}")
         else:
             self.imageViewer.setText("Please select a folder first!")
+    
+    def onAnnotationSelected(self):  
+        if self.lineAnndropDown.currentText():
+            self.nextLine.setEnabled(True)
+
+    def save_annotation(self):
+        current_image_name = self.imageName.text()  # current image name
+        selected_annotation = self.lineAnndropDown.currentText()
+        if selected_annotation and current_image_name in self.lineAnnotations:
+            if selected_annotation not in self.lineAnnotations[current_image_name]:
+                self.lineAnnotations[current_image_name].append(selected_annotation)
+            self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
+        else:
+            # If the annotation wasn't saved, disable the nextLine button
+            self.nextLine.setEnabled(False)
+
+    def check_annotation_completeness(self): ## error handling
+        # Get the current image name
+        current_image_name = self.imageName.text()
+
+        # Get the number of annotations for the current image
+        annotations = self.lineAnnotations.get(current_image_name, [])
+        annotation_count = len(annotations)
+
+        # Fetch the line data for the current image from the JSON data
+        if hasattr(self, 'json_data') and self.json_data:
+            image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
+            if image_data:
+                line_count = len(image_data[0]['edges_positive'])
+            else:
+                
+                return print("Error: Image data not found in JSON!")
+        else:
+            
+            return print("Error: JSON data not loaded!")
+
+        # Compare the annotation count with the line count
+        if annotation_count == line_count:
+            print("Annotations are complete for the current image.")
+            print("List of annotations for the current image:", annotations)
+        else:
+            print(f"Error: Annotations mismatch! {annotation_count} annotations found for {line_count} lines.")
+
+
 
     def show_image(self, index):
         if 0 <= index < len(self.image_files):
@@ -288,6 +340,8 @@ class LineAnnotationTool(QMainWindow):
             self.imageViewer.setText("No image to display!")
 
     def next_image(self):
+        self.check_annotation_completeness() # call error handling 
+        self.lineAnnotations[self.imageName.text()] = []
         #Load the next image in the directory
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
@@ -302,6 +356,7 @@ class LineAnnotationTool(QMainWindow):
         self.previousLine.setEnabled(False)
 
     def previous_image(self):
+        self.lineAnnotations[self.imageName.text()] = []
         #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
@@ -405,7 +460,7 @@ class LineAnnotationTool(QMainWindow):
         # Display the image with the overlayed lines
         self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
         self.lineProgressBar()
-        self.nextLine.setEnabled(True)
+        self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(True)
     
     def next_line(self):
@@ -421,6 +476,9 @@ class LineAnnotationTool(QMainWindow):
 
     def previous_line(self):
         if hasattr(self, 'json_data') and self.json_data:
+            current_image_name = self.imageName.text()
+            if current_image_name in self.lineAnnotations and self.lineAnnotations[current_image_name]:
+                self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
             if self.current_line_index > 0:
                 self.current_line_index -= 1
                 self.load_line()
