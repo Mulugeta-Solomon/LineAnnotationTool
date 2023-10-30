@@ -244,7 +244,7 @@ class LineAnnotationTool(QMainWindow):
                     self.current_image_index = 0
                     self.show_image(self.current_image_index)
                     self.progressBarImage.setMaximum(len(self.image_files))
-                    self.imageProgressbar()
+                    self.imageProgressBar()
                 else:
                     self.imageViewer.setText("No image files in the selected folder!")
             except Exception as err:
@@ -271,7 +271,7 @@ class LineAnnotationTool(QMainWindow):
             self.current_line_index = 0
             self.load_line()
             self.show_image(self.current_image_index)
-            self.imageProgressbar()
+            self.imageProgressBar()
         else:
             self.imageViewer.setText("This is the last image!")
 
@@ -282,11 +282,11 @@ class LineAnnotationTool(QMainWindow):
             self.current_line_index = 0
             self.load_line()
             self.show_image(self.current_image_index)
-            self.imageProgressbar()
+            self.imageProgressBar()
         else:
             self.imageViewer.setText("This is the first image!")
 
-    def imageProgressbar(self):
+    def imageProgressBar(self):
         self.progressBarImage.setValue(self.current_image_index + 1)
         self.progImage.setText(f"{self.current_image_index + 1} of {len(self.image_files)} images annotated")
 
@@ -361,18 +361,40 @@ class LineAnnotationTool(QMainWindow):
 
         # Display the image with the overlayed lines
         self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+        self.lineProgressBar()
     
     def next_line(self):
         if hasattr(self, 'json_data') and self.json_data:
             if self.current_line_index < len(self.json_data[0]['edges_positive']) - 1:
                 self.current_line_index += 1
                 self.load_line()
+                self.lineProgressBar()
 
     def previous_line(self):
         if hasattr(self, 'json_data') and self.json_data:
             if self.current_line_index > 0:
                 self.current_line_index -= 1
                 self.load_line()
+                self.lineProgressBar()
+    
+    def lineProgressBar(self):
+        if not hasattr(self, 'json_data'):
+            self.progressBarLine.setValue(0)
+            return self.filePath.setText("File not Selected")
+
+        current_image_name = self.image_files[self.current_image_index]
+        image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
+        if not image_data:
+            self.progressBarLine.setValue(0)
+            return self.filePath.setText("File not Selected")
+        
+        # Set the progress bar's maximum value
+        total_lines = len(image_data[0]['edges_positive'])
+        self.progressBarLine.setMaximum(total_lines)
+        
+        # Update the progress bar's value
+        self.progressBarLine.setValue(self.current_line_index + 1)
+        self.progLine.setText(f"{self.current_line_index + 1} of {total_lines} lines annotated")
 
 
 SCALE_FACTOR = 1.5
