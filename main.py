@@ -5,7 +5,7 @@ import sys
 import os
 import json
 from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar, QComboBox, QWidget, QHBoxLayout, QFrame, QLabel, QPushButton
-from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject, QPointF
+from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject, QPointF, Qt
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
 from PyQt5.QtWidgets import QFileDialog
 
@@ -75,22 +75,43 @@ class LineAnnotationTool(QMainWindow):
         self.frame_6.setObjectName("frame_6")
         
         self.lineAnnotation = QLabel(self.frame_6)
-        self.lineAnnotation.setGeometry(scaleRect(QRect(50, 50, 111, 31)))
+        self.lineAnnotation.setGeometry(scaleRect(QRect(45, 50, 120, 31)))
         self.lineAnnotation.setObjectName("lineAnnotation")
         
         self.lineAnndropDown = QComboBox(self.frame_6)
-        self.lineAnndropDown.setGeometry(scaleRect(QRect(40, 110, 151, 31)))
+        self.lineAnndropDown.setGeometry(scaleRect(QRect(15, 110, 170, 31)))
         self.lineAnndropDown.setEditable(True)
         self.lineAnndropDown.setObjectName("lineAnndropDown")
+            # Add the new labels
+        self.lineAnndropDown.addItem("Horizontal Upper Edge (HUE)") # Ceilings and Roofs
+        self.lineAnndropDown.addItem("Wall Edge (WE)") # Any edge (vertical or horizontal) found on walls
+        self.lineAnndropDown.addItem("Horizontal Lower Edge (HLE)") # Floors and Foundation Edges
+        self.lineAnndropDown.addItem("Door Edge (DE)") # Edges around doors, both interior and exterior
+        self.lineAnndropDown.addItem("Window Edge (WndE)") # : Edges around windows
+        self.lineAnndropDown.addItem("Miscellaneous Objects (MO)") # Any object or covered by the above categories
+        lineEdit = self.lineAnndropDown.lineEdit()
+        if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
+            lineEdit.setReadOnly(True)  # Make line edit read-only
+            lineEdit.setAlignment(Qt.AlignCenter)
+            lineEdit.setPlaceholderText("Select Line Annotation Label")
         
         self.imageAnnotation = QLabel(self.frame_6)
-        self.imageAnnotation.setGeometry(scaleRect(QRect(270, 50, 131, 31)))
+        self.imageAnnotation.setGeometry(scaleRect(QRect(250, 50, 180, 31)))
         self.imageAnnotation.setObjectName("imageAnnotation")
         
         self.imageAnndropDown = QComboBox(self.frame_6)
-        self.imageAnndropDown.setGeometry(scaleRect(QRect(260, 110, 151, 31)))
+        self.imageAnndropDown.setGeometry(scaleRect(QRect(250, 110, 160, 31)))
         self.imageAnndropDown.setEditable(True)
         self.imageAnndropDown.setObjectName("imageAnndropDown")
+    
+        self.imageAnndropDown.addItem("Interior Environment (IE)")
+        self.imageAnndropDown.addItem("Exterior Environment (EE)")
+        lineEdit = self.imageAnndropDown.lineEdit()
+        if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
+            lineEdit.setReadOnly(True)  # Make line edit read-only
+            lineEdit.setAlignment(Qt.AlignCenter)
+            lineEdit.setPlaceholderText("Select Image Class")
+
         
         self.verticalLayout.addWidget(self.frame_6)
         self.frame_7 = QFrame(self.frame)
@@ -100,7 +121,7 @@ class LineAnnotationTool(QMainWindow):
         
         self.progressBarLine = QProgressBar(self.frame_7)
         self.progressBarLine.setGeometry(scaleRect(QRect(10, 60, 321, 31)))
-        self.progressBarLine.setProperty("value", 24)
+        self.progressBarLine.setProperty("value", 0)
         self.progressBarLine.setObjectName("progressBarLine")
         
         self.Save = QPushButton(self.frame_7)
@@ -109,7 +130,7 @@ class LineAnnotationTool(QMainWindow):
         
         self.progressBarImage = QProgressBar(self.frame_7)
         self.progressBarImage.setGeometry(scaleRect(QRect(10, 140, 321, 31)))
-        self.progressBarImage.setProperty("value", 24)
+        self.progressBarImage.setProperty("value", 0)
         self.progressBarImage.setObjectName("progressBarImage")
         
         self.progLine = QLabel(self.frame_7)
@@ -211,10 +232,10 @@ class LineAnnotationTool(QMainWindow):
         self.selectFile.setText(_translate("LineAnnotationTool", "Select the JSON File"))
         self.loadImage.setText(_translate("LineAnnotationTool", "Load Image"))
         self.loadLine.setText(_translate("LineAnnotationTool", "Load Line"))
-        self.lineAnnotation.setText(_translate("LineAnnotationTool", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:600;\">Line Annotation </span></p></body></html>"))
-        self.lineAnndropDown.setCurrentText(_translate("LineAnnotationTool", "Select Line Class"))
-        self.imageAnnotation.setText(_translate("LineAnnotationTool", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:600;\">Image Annotation</span></p></body></html>"))
-        self.imageAnndropDown.setCurrentText(_translate("LineAnnotationTool", "Select Image Class"))
+        self.lineAnnotation.setText(_translate("LineAnnotationTool", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:600;\">Edge Annotation </span></p></body></html>"))
+        self.lineAnndropDown.setCurrentText(_translate("LineAnnotationTool", "Select Edge Label"))
+        self.imageAnnotation.setText(_translate("LineAnnotationTool", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:600;\">Environment Annotation</span></p></body></html>"))
+        self.imageAnndropDown.setCurrentText(_translate("LineAnnotationTool", "Select Environment Label"))
         self.Save.setText(_translate("LineAnnotationTool", "Save"))
         self.progLine.setText(_translate("LineAnnotationTool", "Progress Bar For Line In the Image"))
         self.progImage.setText(_translate("LineAnnotationTool", "Progress Bar for the Image in the Path"))
@@ -343,7 +364,7 @@ class LineAnnotationTool(QMainWindow):
             p1 = QPointF(start_point[0], start_point[1])
             p2 = QPointF(end_point[0], end_point[1])
             painter.drawLine(p1, p2)
-            #painter.drawLine(start_point[0], start_point[1], end_point[0], end_point[1])
+            
         
         # Set the color for the junction points
         pen = QPen(QColor(52, 255, 236))  # RGB for blue color
@@ -352,9 +373,23 @@ class LineAnnotationTool(QMainWindow):
         painter.setBrush(brush)
         radius = 2  # Set the radius for the circle
 
-        # Draw the junction points
-        for junction in junctions:
+        junctions_to_draw = set()
+
+        for index, edge in enumerate(edges):
+            if index > self.current_line_index:
+                break
+            junctions_to_draw.add(edge[0])
+            junctions_to_draw.add(edge[1])
+
+    # Draw only the selected junction points
+        for junction_index in junctions_to_draw:
+            junction = junctions[junction_index]
             painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
+
+
+        # Draw the junction points
+       # for junction in junctions:
+        #    painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
 
 
         painter.end()
@@ -365,7 +400,9 @@ class LineAnnotationTool(QMainWindow):
     
     def next_line(self):
         if hasattr(self, 'json_data') and self.json_data:
-            if self.current_line_index < len(self.json_data[0]['edges_positive']) - 1:
+            current_image_name = self.image_files[self.current_image_index]
+            image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name][0]
+            if self.current_line_index < len(image_data['edges_positive']) - 1:
                 self.current_line_index += 1
                 self.load_line()
                 self.lineProgressBar()
@@ -395,6 +432,7 @@ class LineAnnotationTool(QMainWindow):
         # Update the progress bar's value
         self.progressBarLine.setValue(self.current_line_index + 1)
         self.progLine.setText(f"{self.current_line_index + 1} of {total_lines} lines annotated")
+        
 
 
 SCALE_FACTOR = 1.5
