@@ -253,6 +253,16 @@ class LineAnnotationTool(QMainWindow):
         self.buttonsforLine.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button For Line </span></p></body></html>"))
         self.buttonsforImage.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button for Image</span></p></body></html>"))
 
+    def _get_image_data(self, image_name):
+        if not hasattr(self, 'json_data') or not self.json_data:
+            raise Exception("JSON data not loaded!")
+        
+        image_data = [entry for entry in self.json_data if entry['filename'] == image_name]
+        if not image_data:
+            raise Exception("Image data not found in JSON!")
+        
+        return image_data[0]
+    
     def select_folder(self):
         folder_name = QFileDialog.getExistingDirectory(self, "Select a Folder")
         if folder_name:
@@ -263,6 +273,7 @@ class LineAnnotationTool(QMainWindow):
         self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(False)
         folder_name = self.folderPath.text()
+        
         if folder_name not in ["", "No Folder Selected"]:
             # Getting a list of all the image files in the selected folder
             try:
@@ -291,18 +302,13 @@ class LineAnnotationTool(QMainWindow):
     def save_annotation(self):
         current_image_name = self.imageName.text()  # current image name
         selected_annotation = self.lineAnndropDown.currentText()
+        image_data = self._get_image_data(current_image_name)
 
-         # Fetch the line data for the current image from the JSON data
-        if hasattr(self, 'json_data') and self.json_data:
-            image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
-            if image_data:
-                line_count = len(image_data[0]['edges_positive'])
-            else:
-                return print("Error: Image data not found in JSON!")
+        if image_data:
+            line_count = len(image_data['edges_positive'])
         else:
-            return print("Error: JSON data not loaded!")
+            return print("Error: Image data not found in JSON!")
         
-
         if selected_annotation and current_image_name in self.lineAnnotations:
              if len(self.lineAnnotations[current_image_name]) < line_count:
                 self.lineAnnotations[current_image_name].append(selected_annotation)
@@ -320,17 +326,11 @@ class LineAnnotationTool(QMainWindow):
         annotation_count = len(annotations)
 
         # Fetch the line data for the current image from the JSON data
-        if hasattr(self, 'json_data') and self.json_data:
-            image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
-            if image_data:
-                line_count = len(image_data[0]['edges_positive'])
-            else:
-                
-                return print("Error: Image data not found in JSON!")
-        else:
-            
-            return print("Error: JSON data not loaded!")
+        image_data = self._get_image_data(current_image_name)
 
+        if image_data:
+            line_count = len(image_data['edges_positive'])
+       
         # Compare the annotation count with the line count
         if annotation_count == line_count:
             print("Annotations are complete for the current image.")
@@ -403,20 +403,12 @@ class LineAnnotationTool(QMainWindow):
     def load_line(self):
         # This method will extract the required info for the current image and draw the lines.
         current_image_name = self.image_files[self.current_image_index]
-        if not current_image_name or not hasattr(self, 'json_data') or not self.json_data:
-            return self.filePath.setText("File not Selected")
-        
        
-        image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
+        image_data = self._get_image_data(current_image_name)
         if not image_data:
             return self.filePath.setText("File not Selected")
-        
-        image_data = image_data[0]
-        #if self.current_line_index >= len(image_data['edges_positive']):
-         #   self.current_line_index = 0
 
         junctions = image_data['junctions']
-        #edges = [image_data['edges_positive'][:self.current_line_index+1]]
         edges = image_data['edges_positive']
 
 
@@ -461,12 +453,6 @@ class LineAnnotationTool(QMainWindow):
             junction = junctions[junction_index]
             painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
 
-
-        # Draw the junction points
-       # for junction in junctions:
-        #    painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
-
-
         painter.end()
 
         # Display the image with the overlayed lines
@@ -476,39 +462,51 @@ class LineAnnotationTool(QMainWindow):
         self.previousLine.setEnabled(True)
     
     def next_line(self):
-        if hasattr(self, 'json_data') and self.json_data:
-            current_image_name = self.image_files[self.current_image_index]
-            image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name][0]
-            if self.current_line_index < len(image_data['edges_positive']) - 1:
-                self.current_line_index += 1
-                    # Check if you're at the end of the lines for the current image
-                if self.currentLineIndex == len(self.lineAnnotations[self.imageName.text()]):
-                    self.nextLine.setEnabled(False)
-                else:
-                    # Update the dropdown to reflect the next line's annotation, if it exists
-                    self.lineAnndropDown.setCurrentText(self.lineAnnotations[self.imageName.text()][self.currentLineIndex])
-                self.previousLine.setEnabled(True) 
-                self.load_line()
-                self.lineProgressBar()
+       
+        current_image_name = self.image_files[self.current_image_index]
+        image_data = self._get_image_data(current_image_name)
+        if self.current_line_index < len(image_data['edges_positive']) - 1:
+            self.current_line_index += 1
+                # Check if you're at the end of the lines for the current image
+            if self.current_line_index == len(self.lineAnnotations[self.imageName.text()]):
+                self.nextLine.setEnabled(False)
+            else:
+                # Update the dropdown to reflect the next line's annotation, if it exists
+                self.lineAnndropDown.setCurrentText(self.lineAnnotations[self.imageName.text()][self.current_line_index])
+            self.previousLine.setEnabled(True)
+
+            self.lineAnndropDown.setCurrentText("Select Image Class")    
+            self.load_line()
+            self.lineProgressBar()
         #else: 
             #return 
 
     def previous_line(self):
-        if hasattr(self, 'json_data') and self.json_data:
-            current_image_name = self.imageName.text()
-            if current_image_name in self.lineAnnotations and self.lineAnnotations[current_image_name]:
-                self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
-            if self.current_line_index >= 0:
-                self.current_line_index -= 1
-                if self.currentLineIndex < 0:
-                    self.previousLine.setEnabled(False)
-                else:
-                    # Update the dropdown to reflect the previous line's annotation
-                    self.lineAnndropDown.setCurrentText(self.lineAnnotations[self.imageName.text()][self.currentLineIndex])
-                self.nextLine.setEnabled(True)
-                self.load_line()
-                self.lineProgressBar()
-    
+        if not hasattr(self, 'json_data') or not self.json_data:
+            return
+        
+        current_image_name = self.imageName.text()
+
+        # Update annotations
+        if current_image_name in self.lineAnnotations and self.lineAnnotations[current_image_name]:
+            self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
+
+        # Move to the previous line
+        if self.current_line_index >0:
+            self.current_line_index -= 1
+
+            self.lineAnndropDown.setCurrentText("Select Image Class")
+
+            self.previousLine.setEnabled(self.current_line_index > 0)
+        else:
+            self.previousLine.setEnabled(False)
+            
+        # Disable the nextLine button since we've removed the last annotation
+        self.nextLine.setEnabled(False)
+
+        self.load_line()
+        self.lineProgressBar()
+
     def lineProgressBar(self):
         if not hasattr(self, 'json_data'):
             self.progressBarLine.setValue(0)
