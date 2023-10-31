@@ -292,7 +292,9 @@ class LineAnnotationTool(QMainWindow):
                     self.imageViewer.setText("No image files in the selected folder!")
                 for image in self.image_files:
                     if image not in self.lineAnnotations:
-                        self.lineAnnotations[image] = []
+                        image_data = self._get_image_data(image)
+                        num_lines = len(image_data['edges_positive'])
+                        self.lineAnnotations[image] = ["Not Annotated"] * num_lines
             except Exception as err:
                 self.imageViewer.setText(f"Error: {err}")
                 print(f"Error: {err}")
@@ -313,14 +315,27 @@ class LineAnnotationTool(QMainWindow):
         else:
             return print("Error: Image data not found in JSON!")
         
-        if selected_annotation and current_image_name in self.lineAnnotations:
-             if len(self.lineAnnotations[current_image_name]) < line_count:
+        if selected_annotation:
+            if current_image_name not in self.lineAnnotations:
+                self.lineAnnotations[current_image_name] = []
+
+            if len(self.lineAnnotations[current_image_name]) < line_count:
                 self.lineAnnotations[current_image_name].append(selected_annotation)
-                self.load_line()
-                self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
-        else:
+            else:
+                # Overwrite the annotation for the current line
+                self.lineAnnotations[current_image_name][self.current_line_index] = selected_annotation
+
+            self.load_line()
+            self.nextLine.setEnabled(True)
+        
+        #if selected_annotation and current_image_name in self.lineAnnotations:
+         #    if len(self.lineAnnotations[current_image_name]) < line_count:
+          #      self.lineAnnotations[current_image_name].append(selected_annotation)
+           #     self.load_line()
+            #    self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
+        #else:
             # If we've reached the maximum number of annotations for this image
-            self.nextLine.setEnabled(False)
+         #   self.nextLine.setEnabled(False)
 
     def check_annotation_completeness(self): ## error handling
         # Get the current image name
@@ -339,6 +354,7 @@ class LineAnnotationTool(QMainWindow):
         # Compare the annotation count with the line count
         if annotation_count == line_count:
             print("Annotations are complete for the current image.")
+            print(f"Done: Annotation success! {annotation_count} annotations found for {line_count} lines.")
             print("List of annotations for the current image:", annotations)
         else:
             print(f"Error: Annotations mismatch! {annotation_count} annotations found for {line_count} lines.")
@@ -357,7 +373,7 @@ class LineAnnotationTool(QMainWindow):
             self.imageViewer.setText("No image to display!")
 
     def next_image(self):
-        self.check_annotation_completeness() # call error handling 
+        #self.check_annotation_completeness() # call error handling 
         self.lineAnnotations[self.imageName.text()] = []
         #Load the next image in the directory
         if self.current_image_index < len(self.image_files) - 1:
@@ -373,7 +389,7 @@ class LineAnnotationTool(QMainWindow):
         self.previousLine.setEnabled(False)
 
     def previous_image(self):
-        self.lineAnnotations[self.imageName.text()] = []
+        #self.lineAnnotations[self.imageName.text()] = []
         #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
@@ -416,24 +432,27 @@ class LineAnnotationTool(QMainWindow):
         junctions = image_data['junctions']
         edges = image_data['edges_positive']
 
-
         # Draw lines on the current image
         folder_name = self.folderPath.text()
         image_path = os.path.join(folder_name, current_image_name)
         pixmap = QPixmap(image_path)
         painter = QPainter(pixmap)
-        
-        # Define line color and properties
-        annotation_label = self.lineAnnotations[self.imageName.text()][self.current_line_index] if self.current_line_index < len(self.lineAnnotations[self.imageName.text()]) else None
-        color = self.annotation_colors.get(annotation_label, QColor(255, 165, 0))
-        pen = QPen(color)
-        pen.setWidth(2)
-        painter.setPen(pen)
 
-        # Draw lines between junctions as per the edges
-        for index, edge in enumerate(edges):
-            if index > self.current_line_index:
-                break
+        if current_image_name not in self.lineAnnotations:
+            self.lineAnnotations[current_image_name] = [None] * len(edges)
+
+        for i in range(self.current_line_index + 1):
+            edge = edges[i]
+            # Determine color based on annotation
+            current_annotation = self.lineAnnotations[current_image_name][i] if i < len(self.lineAnnotations[current_image_name]) else "Not Annotated"
+            line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
+
+            # Set the color for the line
+            pen = QPen(line_color)
+            pen.setWidth(2)
+            painter.setPen(pen)
+
+            # Draw the specific line
             start_point, end_point = junctions[edge[0]], junctions[edge[1]]
             p1 = QPointF(start_point[0], start_point[1])
             p2 = QPointF(end_point[0], end_point[1])
