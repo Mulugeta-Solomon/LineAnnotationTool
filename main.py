@@ -515,14 +515,13 @@ class LineAnnotationTool(QMainWindow):
 
         # Update annotations
         if current_image_name in self.lineAnnotations and self.lineAnnotations[current_image_name]:
-            self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
-
+            #self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
+            self.lineAnnotations[current_image_name][self.current_line_index] = "Not Annotated"
         # Move to the previous line
         if self.current_line_index >0:
             self.current_line_index -= 1
-
             self.lineAnndropDown.setCurrentText("Select Image Class")
-
+            self.load_line()
             self.previousLine.setEnabled(self.current_line_index > 0)
         else:
             self.previousLine.setEnabled(False)
@@ -530,7 +529,7 @@ class LineAnnotationTool(QMainWindow):
         # Disable the nextLine button since we've removed the last annotation
         self.nextLine.setEnabled(False)
 
-        self.load_line()
+        #self.load_line()
         self.lineProgressBar()
 
     def lineProgressBar(self):
