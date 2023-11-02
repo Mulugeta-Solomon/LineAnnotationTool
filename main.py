@@ -10,6 +10,14 @@ from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
 from PyQt5.QtWidgets import QFileDialog
 
 
+SCALE_FACTOR = 2
+# Scaling function for QRect values
+def scaleRect(rect):
+    return QRect(int(rect.x() * SCALE_FACTOR),
+                 int(rect.y() * SCALE_FACTOR),
+                 int(rect.width() * SCALE_FACTOR),
+                 int(rect.height() * SCALE_FACTOR))
+
 
 class LineAnnotationTool(QMainWindow):
 
@@ -20,6 +28,14 @@ class LineAnnotationTool(QMainWindow):
         self.current_line_index = 0
         self.json_data = None
         self.lineAnnotations = {}
+        self.annotation_colors = {
+            "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
+            "Wall Edge (WE)": QColor(0, 255, 0),  # Green # Any edge (vertical or horizontal) found on walls
+            "Horizontal Lower Edge (HLE)": QColor(0, 0, 255),  # Blue # Floors and Foundation Edges
+            "Door Edge (DE)": QColor(255, 255, 0),  # Yellow  # Edges around doors, both interior and exterior
+            "Window Edge (WndE)": QColor(255, 0, 255),  # Magenta  # Edges around windows
+            "Miscellaneous Objects (MO)": QColor(0, 255, 255)   # Cyan # Any object or covered by the above categories
+        }
         self.initUI(self)
 
     def initUI(self, MainWindow):
@@ -268,14 +284,7 @@ class LineAnnotationTool(QMainWindow):
         self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(False)
         folder_name = self.folderPath.text()
-        self.annotation_colors = {
-            "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
-            "Wall Edge (WE)": QColor(0, 255, 0),  # Green # Any edge (vertical or horizontal) found on walls
-            "Horizontal Lower Edge (HLE)": QColor(0, 0, 255),  # Blue # Floors and Foundation Edges
-            "Door Edge (DE)": QColor(255, 255, 0),  # Yellow  # Edges around doors, both interior and exterior
-            "Window Edge (WndE)": QColor(255, 0, 255),  # Magenta  # Edges around windows
-            "Miscellaneous Objects (MO)": QColor(0, 255, 255)   # Cyan # Any object or covered by the above categories
-        }
+
 
         
         if folder_name not in ["", "No Folder Selected"]:
@@ -387,6 +396,7 @@ class LineAnnotationTool(QMainWindow):
         
         self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(False)
+        self.check_annotation_completeness()
 
     def previous_image(self):
         #self.lineAnnotations[self.imageName.text()] = []
@@ -553,18 +563,12 @@ class LineAnnotationTool(QMainWindow):
         
 
 
-SCALE_FACTOR = 2
-# Scaling function for QRect values
-def scaleRect(rect):
-    return QRect(int(rect.x() * SCALE_FACTOR),
-                 int(rect.y() * SCALE_FACTOR),
-                 int(rect.width() * SCALE_FACTOR),
-                 int(rect.height() * SCALE_FACTOR))
 
 
 if __name__ == "__main__":
     import sys
     app = QApplication(sys.argv)
     MainWindow  = LineAnnotationTool()
+    #app.setStyleSheet(css)
     MainWindow.show()
     sys.exit(app.exec_())
