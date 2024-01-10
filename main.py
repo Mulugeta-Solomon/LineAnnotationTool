@@ -27,7 +27,7 @@ class LineAnnotationTool(QMainWindow):
         self.current_image_index = -1
         self.current_line_index = 0
         self.json_data = None
-        self.lineAnnotations = {}
+        self.annotations = {}
         self.annotation_colors = {
             "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
             "Wall Edge (WE)": QColor(0, 255, 0),  # Green # Any edge (vertical or horizontal) found on walls
@@ -211,6 +211,7 @@ class LineAnnotationTool(QMainWindow):
         self.horizontalLayout.addWidget(self.frame_2)
         self.setCentralWidget(self.centralwidget)
 
+        
         # Connect the functionality
         self.selectFolder.setObjectName("selectFolder")
         self.selectFolder.clicked.connect(self.select_folder)
@@ -235,6 +236,8 @@ class LineAnnotationTool(QMainWindow):
 
         self.lineAnndropDown.activated.connect(self.save_annotation)
         self.lineAnndropDown.currentIndexChanged.connect(self.onAnnotationSelected)
+        self.lineAnndropDown.currentIndexChanged.connect(self.update_line_color)
+
 
         self.retranslateUi(MainWindow)
         QMetaObject.connectSlotsByName(MainWindow)
@@ -283,8 +286,8 @@ class LineAnnotationTool(QMainWindow):
     def load_image(self):
         self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(False)
+        #self.next_image.setEnabled(False) # uncomment it when a method for Image annotation done.
         folder_name = self.folderPath.text()
-
 
         
         if folder_name not in ["", "No Folder Selected"]:
@@ -299,77 +302,23 @@ class LineAnnotationTool(QMainWindow):
                     self.imageProgressBar()
                 else:
                     self.imageViewer.setText("No image files in the selected folder!")
-                for image in self.image_files:
-                    if image not in self.lineAnnotations:
-                        image_data = self._get_image_data(image)
-                        num_lines = len(image_data['edges_positive'])
-                        self.lineAnnotations[image] = ["Not Annotated"] * num_lines
+                
+                self._annotation()
+            
             except Exception as err:
                 self.imageViewer.setText(f"Error: {err}")
                 print(f"Error: {err}")
         else:
             self.imageViewer.setText("Please select a folder first!")
-    
-    def onAnnotationSelected(self):  
-        if self.lineAnndropDown.currentText():
-            self.nextLine.setEnabled(True)
 
-    def save_annotation(self):
-        current_image_name = self.imageName.text()  # current image name
-        selected_annotation = self.lineAnndropDown.currentText()
-        image_data = self._get_image_data(current_image_name)
-
-        if image_data:
-            line_count = len(image_data['edges_positive'])
-        else:
-            return print("Error: Image data not found in JSON!")
-        
-        if selected_annotation:
-            if current_image_name not in self.lineAnnotations:
-                self.lineAnnotations[current_image_name] = []
-
-            if len(self.lineAnnotations[current_image_name]) < line_count:
-                self.lineAnnotations[current_image_name].append(selected_annotation)
-            else:
-                # Overwrite the annotation for the current line
-                self.lineAnnotations[current_image_name][self.current_line_index] = selected_annotation
-
-            self.load_line()
-            self.nextLine.setEnabled(True)
-        
-        #if selected_annotation and current_image_name in self.lineAnnotations:
-         #    if len(self.lineAnnotations[current_image_name]) < line_count:
-          #      self.lineAnnotations[current_image_name].append(selected_annotation)
-           #     self.load_line()
-            #    self.nextLine.setEnabled(True)  # Enable the next line button after saving annotation
-        #else:
-            # If we've reached the maximum number of annotations for this image
-         #   self.nextLine.setEnabled(False)
-
-    def check_annotation_completeness(self): ## error handling
-        # Get the current image name
-        current_image_name = self.imageName.text()
-
-        # Get the number of annotations for the current image
-        annotations = self.lineAnnotations.get(current_image_name, [])
-        annotation_count = len(annotations)
-
-        # Fetch the line data for the current image from the JSON data
-        image_data = self._get_image_data(current_image_name)
-
-        if image_data:
-            line_count = len(image_data['edges_positive'])
-       
-        # Compare the annotation count with the line count
-        if annotation_count == line_count:
-            print("Annotations are complete for the current image.")
-            print(f"Done: Annotation success! {annotation_count} annotations found for {line_count} lines.")
-            print("List of annotations for the current image:", annotations)
-        else:
-            print(f"Error: Annotations mismatch! {annotation_count} annotations found for {line_count} lines.")
-
-
-
+    def _annotation(self):
+        for image in self.image_files:
+            if image not in self.annotations:
+                image_data = self._get_image_data(image)
+                num_lines = len(image_data['edges_positive'])
+                # create a dictionary with lineannotation and imageannotation key inside the the annotation dictionary 
+                self.annotations[image_data['filename']] = {'lineannotation': [None for lineannotation in range(num_lines)], 'imageannotation': None}
+                            
     def show_image(self, index):
         if 0 <= index < len(self.image_files):
             folder_name = self.folderPath.text()
@@ -380,10 +329,83 @@ class LineAnnotationTool(QMainWindow):
             self.imageName.setText(self.image_files[index])
         else:
             self.imageViewer.setText("No image to display!")
+    
+    def onAnnotationSelected(self):  # this method need a revision 
+        if self.lineAnndropDown.currentText():
+            self.nextLine.setEnabled(True)
+
+    def save_annotation(self):
+        current_image_name = self.imageName.text()  # current image name
+        selected_line_annotation = self.lineAnndropDown.currentText()
+        selected_image_annotation = self.imageAnndropDown.currentText()
+        image_data = self._get_image_data(current_image_name)
+
+        
+        if selected_line_annotation:
+            lineannotation = self.annotations.get(current_image_name, {}).get('lineannotation', [])
+            if len(lineannotation) > self.current_line_index and lineannotation[self.current_line_index] is None:
+                lineannotation[self.current_line_index] = selected_line_annotation
+   
+
+            #if there is a none value in self.annotations[current_image_name][current_line] then replace it with selected_line_annotation
+            #if self.annotations[current_image_name]['lineannotation'][self.current_line_index] is None:
+             #   self.annotations[current_image_name]['lineannotation'][self.current_line_index] = selected_line_annotation
+        
+        if selected_image_annotation:
+            image_annotation = self.annotations.get(current_image_name, {}).get('imageannotation')
+            if image_annotation is None:
+                self.annotations[current_image_name]['imageannotation'] = selected_image_annotation
+        
+        #if selected_image_annotation:
+         #   if self.annotations[current_image_name]['imageannotation'] is None:
+          #      self.annotations[current_image_name]['imageannotation'] = selected_image_annotation
+            
+        
+        # if there is no none value in self.annotations[current_image_name][current_line] then disable the nextLine button
+        annotations = self.annotations.get(current_image_name, {})
+        lineannotation = annotations.get('lineannotation', [])
+        imageannotation = annotations.get('imageannotation')
+
+        if None not in lineannotation and imageannotation is not None:
+            self.nextLine.setEnabled(False) # Disable the next line button since we've reached the maximum number of annotations for this image
+
+
+        # if there is no none value in self.annotations[current_image_name][current_line] then disable the nextLine button
+        #if None not in self.annotations[current_image_name]['lineannotation'] and self.annotations[current_image_name]['imageannotation'] is not None:
+         #   self.nextLine.setEnabled(False) # Disable the next line button since we've reached the maximum number of annotations for this image
+
+         
+    def check_annotation_completeness(self): ## error handling
+        # Get the current image name
+        current_image_name = self.imageName.text()
+
+        # Get the number of annotations for the current image
+        annotations = [annotation for annotation in self.annotations[current_image_name]['lineannotation'] if annotation is not None] 
+        annotation_count = len(annotations)
+
+        # Fetch the line data for the current image from the JSON data
+        image_data = self._get_image_data(current_image_name)
+
+        line_count = 0
+        if image_data:
+            line_count = len(image_data['edges_positive'])
+       
+        # Compare the annotation count with the line count
+        if annotation_count == line_count:
+            print("Annotations are complete for the current image.")
+            print(f"Done: Annotation success! {annotation_count} annotations found for {line_count} lines.")
+            print("List of annotations for the current image:", annotations)
+        else:
+            print(f"Error: Annotations incomplete for image {current_image_name}. {annotation_count} annotations found for {line_count} lines.")
+
+        
+        #TODO: Add a check for the image annotation as well
+            
 
     def next_image(self):
         #self.check_annotation_completeness() # call error handling 
-        self.lineAnnotations[self.imageName.text()] = []
+        #self.annotations[self.imageName.text()] = []
+
         #Load the next image in the directory
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
@@ -399,7 +421,7 @@ class LineAnnotationTool(QMainWindow):
         self.check_annotation_completeness()
 
     def previous_image(self):
-        #self.lineAnnotations[self.imageName.text()] = []
+        #self.annotations[self.imageName.text()] = []
         #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
@@ -433,7 +455,7 @@ class LineAnnotationTool(QMainWindow):
     
     def load_line(self):
         # This method will extract the required info for the current image and draw the lines.
-        current_image_name = self.image_files[self.current_image_index]
+        current_image_name = self.imageName.text()
        
         image_data = self._get_image_data(current_image_name)
         if not image_data:
@@ -448,17 +470,27 @@ class LineAnnotationTool(QMainWindow):
         pixmap = QPixmap(image_path)
         painter = QPainter(pixmap)
 
-        if current_image_name not in self.lineAnnotations:
-            self.lineAnnotations[current_image_name] = [None] * len(edges)
+        #if current_image_name not in self.annotations: # something is not right with this line of code 
+         #   self.annotations[current_image_name] = [None] * len(edges)
+        
+        annotations = self.annotations.get(current_image_name, {})
+        lineannotation = annotations.get('lineannotation', [])
+        imageannotation = annotations.get('imageannotation')
 
         for i in range(self.current_line_index + 1):
             edge = edges[i]
             # Determine color based on annotation
-            current_annotation = self.lineAnnotations[current_image_name][i] if i < len(self.lineAnnotations[current_image_name]) else "Not Annotated"
-            line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
+            current_annotation = lineannotation[i] 
+            
+            #current_annotation = self.annotations[current_image_name][i] if i < len(self.annotations[current_image_name]) else "Not Annotated"
+            print(f"Current annotation: {current_annotation}")
+            if current_annotation is None:
+                self.line_color = QColor(255, 165, 0)  # Default color if annotation not found
+            else:
+                self.line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
 
             # Set the color for the line
-            pen = QPen(line_color)
+            pen = QPen(self.line_color)
             pen.setWidth(2)
             painter.setPen(pen)
 
@@ -467,6 +499,7 @@ class LineAnnotationTool(QMainWindow):
             p1 = QPointF(start_point[0], start_point[1])
             p2 = QPointF(end_point[0], end_point[1])
             painter.drawLine(p1, p2)
+            
             
         
         # Set the color for the junction points
@@ -494,43 +527,50 @@ class LineAnnotationTool(QMainWindow):
         # Display the image with the overlayed lines
         self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
         self.lineProgressBar()
-        self.nextLine.setEnabled(False)
+        self.nextLine.setEnabled(True)
         self.previousLine.setEnabled(True)
+    
+    def update_line_color(self, index):
+        # Update the line color based on the selected class
+     #   selected_class = self.lineAnndropDown.itemText(index)
+      #  self.line_color = self.annotation_colors.get(selected_class, QColor(255, 165, 0))  # Default color if class not found
+
+        # Redraw the line with the new color
+        self.load_line()
+
     
     def next_line(self):
        
-        current_image_name = self.image_files[self.current_image_index]
+        current_image_name = self.imageName.text()
         image_data = self._get_image_data(current_image_name)
         if self.current_line_index < len(image_data['edges_positive']) - 1:
             self.current_line_index += 1
                 # Check if you're at the end of the lines for the current image
-            if self.current_line_index == len(self.lineAnnotations[self.imageName.text()]):
+            if self.current_line_index == len(self.annotations[self.imageName.text()]):
                 self.nextLine.setEnabled(False)
             else:
                 # Update the dropdown to reflect the next line's annotation, if it exists
-                self.lineAnndropDown.setCurrentText(self.lineAnnotations[self.imageName.text()][self.current_line_index])
+                self.lineAnndropDown.setCurrentText(self.annotations[self.imageName.text()]["lineannotation"][self.current_line_index])
             self.previousLine.setEnabled(True)
 
-            self.lineAnndropDown.setCurrentText("Select Image Class")    
+            self.lineAnndropDown.setCurrentText("Select Line Class")
+            self.imageAnndropDown.setCurrentText("Select Image Class")    
             self.load_line()
             self.lineProgressBar()
-        #else: 
-            #return 
+     
 
     def previous_line(self):
-        if not hasattr(self, 'json_data') or not self.json_data:
-            return
         
         current_image_name = self.imageName.text()
 
         # Update annotations
-        if current_image_name in self.lineAnnotations and self.lineAnnotations[current_image_name]:
-            #self.lineAnnotations[current_image_name].pop()  # Remove the last annotation
-            self.lineAnnotations[current_image_name][self.current_line_index] = "Not Annotated"
+        if current_image_name in self.annotations and self.annotations[current_image_name]["lineannotation"][self.current_line_index] is not None:
+            #self.annotations[current_image_name].pop()  # Remove the last annotation
+            self.annotations[current_image_name]["lineannotation"][self.current_line_index] = None
         # Move to the previous line
         if self.current_line_index >0:
             self.current_line_index -= 1
-            self.lineAnndropDown.setCurrentText("Select Image Class")
+            self.lineAnndropDown.setCurrentText("Select Line Class")
             self.load_line()
             self.previousLine.setEnabled(self.current_line_index > 0)
         else:
@@ -547,7 +587,7 @@ class LineAnnotationTool(QMainWindow):
             self.progressBarLine.setValue(0)
             return self.filePath.setText("File not Selected")
 
-        current_image_name = self.image_files[self.current_image_index]
+        current_image_name = self.imageName.text()
         image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
         if not image_data:
             self.progressBarLine.setValue(0)
