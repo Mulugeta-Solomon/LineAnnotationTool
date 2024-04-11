@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar
 from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject, QPointF, Qt
 from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
 from PyQt5.QtWidgets import QFileDialog
+from functools import partial
 
 
 SCALE_FACTOR = 2
@@ -27,7 +28,10 @@ class LineAnnotationTool(QMainWindow):
         self.current_image_index = -1
         self.current_line_index = 0
         self.json_data = None
-        self.annotations = {}
+        self.image_data_cache = {} # cache for storing image data
+
+        self.annotations = {}  # filename: {edge_annotation:[len(lines)], environment_annoation:int}
+
         self.annotation_colors = {
             "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
             "Wall Edge (WE)": QColor(0, 255, 0),  # Green # Any edge (vertical or horizontal) found on walls
@@ -36,6 +40,8 @@ class LineAnnotationTool(QMainWindow):
             "Window Edge (WndE)": QColor(255, 0, 255),  # Magenta  # Edges around windows
             "Miscellaneous Objects (MO)": QColor(0, 255, 255)   # Cyan # Any object or covered by the above categories
         }
+        self.image_annotation_var = ['Indoor Environment', 'Outdoor Environment']
+        self.line_annotation_var = ["Horizontal Upper Edge (HUE)",  "Wall Edge (WE)", "Horizontal Lower Edge (HLE)", "Door Edge (DE)",  "Window Edge (WndE)", "Miscellaneous Objects (MO)"]
         self.initUI(self)
 
     def initUI(self, MainWindow):
@@ -96,21 +102,7 @@ class LineAnnotationTool(QMainWindow):
         self.lineAnnotation.setObjectName("lineAnnotation")
         
         self.lineAnndropDown = QComboBox(self.frame_6)
-        self.lineAnndropDown.setGeometry(scaleRect(QRect(15, 110, 170, 31)))
-        self.lineAnndropDown.setEditable(True)
-        self.lineAnndropDown.setObjectName("lineAnndropDown")
-            # Add the new labels
-        self.lineAnndropDown.addItem("Horizontal Upper Edge (HUE)") # Ceilings and Roofs
-        self.lineAnndropDown.addItem("Wall Edge (WE)") # Any edge (vertical or horizontal) found on walls
-        self.lineAnndropDown.addItem("Horizontal Lower Edge (HLE)") # Floors and Foundation Edges
-        self.lineAnndropDown.addItem("Door Edge (DE)") # Edges around doors, both interior and exterior
-        self.lineAnndropDown.addItem("Window Edge (WndE)") # : Edges around windows
-        self.lineAnndropDown.addItem("Miscellaneous Objects (MO)") # Any object or covered by the above categories
-        lineEdit = self.lineAnndropDown.lineEdit()
-        if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
-            lineEdit.setReadOnly(True)  # Make line edit read-only
-            lineEdit.setAlignment(Qt.AlignCenter)
-            lineEdit.setPlaceholderText("Select Line Annotation Label")
+        self.configureComboBox(self.lineAnndropDown, "Select Line Annotation Label")
         
         self.imageAnnotation = QLabel(self.frame_6)
         self.imageAnnotation.setGeometry(scaleRect(QRect(250, 50, 180, 31)))
@@ -120,12 +112,11 @@ class LineAnnotationTool(QMainWindow):
         self.imageAnndropDown.setGeometry(scaleRect(QRect(250, 110, 160, 31)))
         self.imageAnndropDown.setEditable(True)
         self.imageAnndropDown.setObjectName("imageAnndropDown")
-    
-        self.imageAnndropDown.addItem("Interior Environment (IE)")
-        self.imageAnndropDown.addItem("Exterior Environment (EE)")
+        for i in range(len(self.image_annotation_var)):
+            self.imageAnndropDown.addItem(self.image_annotation_var[i])
         lineEdit = self.imageAnndropDown.lineEdit()
         if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
-            lineEdit.setReadOnly(True)  # Make line edit read-only
+            lineEdit.setReadOnly(True)  
             lineEdit.setAlignment(Qt.AlignCenter)
             lineEdit.setPlaceholderText("Select Image Class")
 
@@ -213,31 +204,23 @@ class LineAnnotationTool(QMainWindow):
 
         
         # Connect the functionality
-        self.selectFolder.setObjectName("selectFolder")
         self.selectFolder.clicked.connect(self.select_folder)
-
-        self.loadImage.setObjectName("loadImage")
         self.loadImage.clicked.connect(self.load_image)
-
-        self.nextImage.setObjectName("nextImage")
         self.nextImage.clicked.connect(self.next_image)
-
-        self.PreviousImage.setObjectName("PreviousImage")
         self.PreviousImage.clicked.connect(self.previous_image)
 
-        self.selectFile.setObjectName("selectFile")
         self.selectFile.clicked.connect(self.select_file)
-
-        self.loadLine.setObjectName("loadLine")
         self.loadLine.clicked.connect(self.load_line)
-
         self.nextLine.clicked.connect(self.next_line)
         self.previousLine.clicked.connect(self.previous_line)
 
         self.lineAnndropDown.activated.connect(self.save_annotation)
         self.lineAnndropDown.currentIndexChanged.connect(self.onAnnotationSelected)
-        self.lineAnndropDown.currentIndexChanged.connect(self.update_line_color)
+        
+        # update_line_color = partial(self.update_line_color, self.lineAnndropDown.currentIndex())
+        # self.lineAnndropDown.currentIndexChanged.connect(update_line_color)
 
+        self.Save.clicked.connect(self.save_file)
 
         self.retranslateUi(MainWindow)
         QMetaObject.connectSlotsByName(MainWindow)
@@ -267,7 +250,27 @@ class LineAnnotationTool(QMainWindow):
         self.buttonsforLine.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button For Line </span></p></body></html>"))
         self.buttonsforImage.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button for Image</span></p></body></html>"))
 
+    def configureComboBox(self, comboBox, placeholderText):
+        if comboBox == self.lineAnndropDown:
+            comboBox.setGeometry(scaleRect(QRect(15, 110, 170, 31)))
+            comboBox.setEditable(True)
+            comboBox.setObjectName("lineAnndropDown")
+
+            for i in range(len(self.line_annotation_var)):
+                comboBox.addItem(self.line_annotation_var[i])
+            
+            lineEdit = comboBox.lineEdit()
+            if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
+                lineEdit.setReadOnly(True)  
+                lineEdit.setAlignment(Qt.AlignCenter)
+                lineEdit.setPlaceholderText("Select Line Annotation Label")
+
+    
     def _get_image_data(self, image_name):
+        # check if the result is already in the cache
+        if image_name in self.image_data_cache:
+            return self.image_data_cache[image_name]
+        
         if not hasattr(self, 'json_data') or not self.json_data:
             raise Exception("JSON data not loaded!")
         
@@ -275,6 +278,7 @@ class LineAnnotationTool(QMainWindow):
         if not image_data:
             raise Exception("Image data not found in JSON!")
         
+        self.image_data_cache[image_name] = image_data[0]
         return image_data[0]
     
     def select_folder(self):
@@ -345,22 +349,13 @@ class LineAnnotationTool(QMainWindow):
             lineannotation = self.annotations.get(current_image_name, {}).get('lineannotation', [])
             if len(lineannotation) > self.current_line_index and lineannotation[self.current_line_index] is None:
                 lineannotation[self.current_line_index] = selected_line_annotation
+                self.load_line()
    
-
-            #if there is a none value in self.annotations[current_image_name][current_line] then replace it with selected_line_annotation
-            #if self.annotations[current_image_name]['lineannotation'][self.current_line_index] is None:
-             #   self.annotations[current_image_name]['lineannotation'][self.current_line_index] = selected_line_annotation
-        
         if selected_image_annotation:
             image_annotation = self.annotations.get(current_image_name, {}).get('imageannotation')
             if image_annotation is None:
                 self.annotations[current_image_name]['imageannotation'] = selected_image_annotation
-        
-        #if selected_image_annotation:
-         #   if self.annotations[current_image_name]['imageannotation'] is None:
-          #      self.annotations[current_image_name]['imageannotation'] = selected_image_annotation
-            
-        
+   
         # if there is no none value in self.annotations[current_image_name][current_line] then disable the nextLine button
         annotations = self.annotations.get(current_image_name, {})
         lineannotation = annotations.get('lineannotation', [])
@@ -369,13 +364,8 @@ class LineAnnotationTool(QMainWindow):
         if None not in lineannotation and imageannotation is not None:
             self.nextLine.setEnabled(False) # Disable the next line button since we've reached the maximum number of annotations for this image
 
-
-        # if there is no none value in self.annotations[current_image_name][current_line] then disable the nextLine button
-        #if None not in self.annotations[current_image_name]['lineannotation'] and self.annotations[current_image_name]['imageannotation'] is not None:
-         #   self.nextLine.setEnabled(False) # Disable the next line button since we've reached the maximum number of annotations for this image
-
          
-    def check_annotation_completeness(self): ## error handling
+    def check_annotation_completeness(self): # for error handling
         # Get the current image name
         current_image_name = self.imageName.text()
 
@@ -481,13 +471,9 @@ class LineAnnotationTool(QMainWindow):
             edge = edges[i]
             # Determine color based on annotation
             current_annotation = lineannotation[i] 
-            
-            #current_annotation = self.annotations[current_image_name][i] if i < len(self.annotations[current_image_name]) else "Not Annotated"
-            print(f"Current annotation: {current_annotation}")
-            if current_annotation is None:
-                self.line_color = QColor(255, 165, 0)  # Default color if annotation not found
-            else:
-                self.line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
+            print(f"Current annotation: {current_annotation}") # for debugging 
+
+            self.line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
 
             # Set the color for the line
             pen = QPen(self.line_color)
@@ -517,7 +503,7 @@ class LineAnnotationTool(QMainWindow):
             junctions_to_draw.add(edge[0])
             junctions_to_draw.add(edge[1])
 
-    # Draw only the selected junction points
+        # Draw only the selected junction points
         for junction_index in junctions_to_draw:
             junction = junctions[junction_index]
             painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
@@ -530,13 +516,13 @@ class LineAnnotationTool(QMainWindow):
         self.nextLine.setEnabled(True)
         self.previousLine.setEnabled(True)
     
-    def update_line_color(self, index):
-        # Update the line color based on the selected class
-     #   selected_class = self.lineAnndropDown.itemText(index)
-      #  self.line_color = self.annotation_colors.get(selected_class, QColor(255, 165, 0))  # Default color if class not found
+    # def update_line_color(self, index):
+    #     # Update the line color based on the selected class
+    #     selected_class = self.lineAnndropDown.itemText(index)
+    #     self.line_color = self.annotation_colors.get(selected_class, QColor(255, 165, 0))  # Default color if class not found
 
-        # Redraw the line with the new color
-        self.load_line()
+    #     # Redraw the line with the new color
+    #     self.load_line()
 
     
     def next_line(self):
@@ -600,6 +586,9 @@ class LineAnnotationTool(QMainWindow):
         # Update the progress bar's value
         self.progressBarLine.setValue(self.current_line_index + 1)
         self.progLine.setText(f"{self.current_line_index + 1} of {total_lines} lines annotated")
+
+    def save_file(self):
+        pass
         
 
 
