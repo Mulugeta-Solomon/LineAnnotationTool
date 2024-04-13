@@ -69,26 +69,26 @@ class LineAnnotationTool(QMainWindow):
         self.frame_5.setObjectName("frame_5")
 
         self.folderPath = QLabel(self.frame_5)
-        self.folderPath.setGeometry(scaleRect(QRect(30, 20, 151, 41)))
+        self.folderPath.setGeometry(scaleRect(QRect(26, 18, 131, 37)))
         self.folderPath.setObjectName("folderPath")
         self.filePath = QLabel(self.frame_5)
-        self.filePath.setGeometry(scaleRect(QRect(30, 70, 151, 41)))
+        self.filePath.setGeometry(scaleRect(QRect(26, 63, 131, 37)))
         self.filePath.setObjectName("filePath")
         
         self.selectFolder = QPushButton(self.frame_5)
-        self.selectFolder.setGeometry(scaleRect(QRect(210, 20, 121, 41)))
+        self.selectFolder.setGeometry(scaleRect(QRect(184, 18, 109, 37)))
         self.selectFolder.setObjectName("selectFolder")
         
         self.selectFile = QPushButton(self.frame_5)
-        self.selectFile.setGeometry(scaleRect(QRect(210, 70, 121, 41)))
+        self.selectFile.setGeometry(scaleRect(QRect(184, 63, 109, 37)))
         self.selectFile.setObjectName("selectFile")
         
         self.loadImage = QPushButton(self.frame_5)
-        self.loadImage.setGeometry(scaleRect(QRect(80, 130, 111, 41)))
+        self.loadImage.setGeometry(scaleRect(QRect(66, 118, 99, 37)))
         self.loadImage.setObjectName("loadImage")
         
         self.loadLine = QPushButton(self.frame_5)
-        self.loadLine.setGeometry(scaleRect(QRect(280, 130, 121, 41)))
+        self.loadLine.setGeometry(scaleRect(QRect(248, 118, 109, 37)))
         self.loadLine.setObjectName("loadLine")
         
         self.verticalLayout.addWidget(self.frame_5)
@@ -128,25 +128,25 @@ class LineAnnotationTool(QMainWindow):
         self.frame_7.setObjectName("frame_7")
         
         self.progressBarLine = QProgressBar(self.frame_7)
-        self.progressBarLine.setGeometry(scaleRect(QRect(10, 60, 321, 31)))
+        self.progressBarLine.setGeometry(scaleRect(QRect(10, 52, 289, 26)))
         self.progressBarLine.setProperty("value", 0)
         self.progressBarLine.setObjectName("progressBarLine")
         
         self.Save = QPushButton(self.frame_7)
-        self.Save.setGeometry(scaleRect(QRect(360, 120, 101, 51)))
+        self.Save.setGeometry(scaleRect(QRect(315, 98, 87, 44)))
         self.Save.setObjectName("Save")
         
         self.progressBarImage = QProgressBar(self.frame_7)
-        self.progressBarImage.setGeometry(scaleRect(QRect(10, 140, 321, 31)))
+        self.progressBarImage.setGeometry(scaleRect(QRect(10, 112, 289, 26)))
         self.progressBarImage.setProperty("value", 0)
         self.progressBarImage.setObjectName("progressBarImage")
         
         self.progLine = QLabel(self.frame_7)
-        self.progLine.setGeometry(scaleRect(QRect(80, 30, 191, 16)))
+        self.progLine.setGeometry(scaleRect(QRect(64, 24, 153, 11)))
         self.progLine.setObjectName("progLine")
         
         self.progImage = QLabel(self.frame_7)
-        self.progImage.setGeometry(scaleRect(QRect(80, 120, 191, 12)))
+        self.progImage.setGeometry(scaleRect(QRect(64, 98, 153, 8)))
         self.progImage.setObjectName("progImage")
         
         self.verticalLayout.addWidget(self.frame_7)
@@ -186,7 +186,6 @@ class LineAnnotationTool(QMainWindow):
         self.PreviousImage = QPushButton(self.frame_4)
         self.PreviousImage.setGeometry(scaleRect(QRect(100, 480, 91, 31)))
         self.PreviousImage.setObjectName("PreviousImage")
-        
         self.nextImage = QPushButton(self.frame_4)
         self.nextImage.setGeometry(scaleRect(QRect(330, 480, 91, 31)))
         self.nextImage.setObjectName("nextImage")
