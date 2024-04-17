@@ -354,7 +354,7 @@ class LineAnnotationTool(QMainWindow):
             image_annotation = self.annotations.get(current_image_name, {}).get('imageannotation')
             if image_annotation is None:
                 self.annotations[current_image_name]['imageannotation'] = selected_image_annotation
-   
+
         # if there is no none value in self.annotations[current_image_name][current_line] then disable the nextLine button
         annotations = self.annotations.get(current_image_name, {})
         lineannotation = annotations.get('lineannotation', [])
@@ -363,7 +363,7 @@ class LineAnnotationTool(QMainWindow):
         if None not in lineannotation and imageannotation is not None:
             self.nextLine.setEnabled(False) # Disable the next line button since we've reached the maximum number of annotations for this image
 
-         
+
     def check_annotation_completeness(self): # for error handling
         # Get the current image name
         current_image_name = self.imageName.text()
@@ -378,7 +378,7 @@ class LineAnnotationTool(QMainWindow):
         line_count = 0
         if image_data:
             line_count = len(image_data['edges_positive'])
-       
+        
         # Compare the annotation count with the line count
         if annotation_count == line_count:
             print("Annotations are complete for the current image.")
