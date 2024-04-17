@@ -3,11 +3,6 @@ const { readFile } = require("fs/promises");
 const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
-mongoose
-  .connect(process.env.DATABASE)
-  .then(() => console.log("Database connected!"))
-  .catch((err) => console.log(err));
-
 const imageDataSchema = new mongoose.Schema({
   junctions: Array,
   height: Number,
@@ -15,8 +10,10 @@ const imageDataSchema = new mongoose.Schema({
   filename: String,
   edges_positive: Array,
   line_annotations: Array,
+  environment_annotation:Boolean,
   status: String,
 });
+
 const imageSchema = new mongoose.Schema({
   filename: String,
   data: Buffer,
@@ -28,6 +25,8 @@ const MongoImage = mongoose.model("image", imageSchema);
 
 async function execute() {
   try {
+    await mongoose.connect(process.env.DATABASE);
+    console.log("Database connected!");
     const data = await readFile("train.json", "utf8");
     const jsonData = JSON.parse(data);
     const all_images = jsonData.length;
@@ -39,6 +38,7 @@ async function execute() {
         filename: jsonData[i]["filename"],
         edges_positive: jsonData[i]["edges_positive"],
         status: "not_annotated",
+        environment_annotation:true,
         line_annotations: Array(jsonData[i]["edges_positive"].length).fill(0),
       });
       await imageData.save();
@@ -55,8 +55,9 @@ async function execute() {
     }
   } catch (err) {
     console.error("Error:", err);
-  } finally {
-    mongoose.connection.close();
+  } 
+  finally{
+    mongoose.disconnect()
   }
 }
 execute();

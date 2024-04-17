@@ -5,7 +5,7 @@ function Welcome() {
   return (
     <div className="flex min-h-screen bg-gray-100">
       <div className="container px-4 py-4 flex flex-col md:flex-row items-center justify-center">
-        <h1 className="text-6xl font-bold text-gray-600 mx-36 ">Welcome!</h1>
+        <h1 className="text-6xl font-bold text-gray-600 mx-36 ">Welcome !</h1>
         {/* Hero Section */}
         <div className="w-full md:w-1/2 text-center md:text-left">
           <h2 className="text-3xl font-bold text-gray-900 my-4">

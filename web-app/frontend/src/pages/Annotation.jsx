@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-// import { ImageWithLines } from "../components/ImageWithLines";
+import { useNavigate } from "react-router-dom";
 import LinedImage from "./LinedImage";
 
 const annotationMap = {
@@ -22,6 +22,7 @@ function AnnotationTool() {
   const [imageFileName, setImageFileName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currentLine, setCurrentLine] = useState(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
@@ -47,10 +48,8 @@ function AnnotationTool() {
       const response = await fetch(
         `${import.meta.env.VITE_IMAGE_API}${filename}`
       );
-      // console.log(response);
+      
       const image = await response.blob();
-
-      // console.log(image);
 
       setCurrentImageURL(URL.createObjectURL(image));
 
@@ -105,22 +104,23 @@ function AnnotationTool() {
   };
 
   const allLinesAreAnnotated = async () => {
-    for (let i = 0; i < currentImageAnnotations.length; i++) {
-      if (currentImageAnnotations[i] == 0) {
-        return false;
-      }
-    }
+    // for (let i = 0; i < currentImageAnnotations.length; i++) {
+    //   if (currentImageAnnotations[i] == 0) {
+    //     return false;
+    //   }
+    // }
     return true;
   };
   const handleSave = async () => {
+    setIsLoading(true);
     if (await allLinesAreAnnotated()) {
       try {
-        setIsLoading(true);
-
+        // upload image data
         try {
           const data = {
             filename: imageFileName,
-            annotations: currentImageAnnotations
+            annotations: currentImageAnnotations,
+            image_annotation:isIndoor
           };
           await fetch(import.meta.env.VITE_UPLOAD_API, {
             method: "POST",
@@ -132,30 +132,32 @@ function AnnotationTool() {
         } catch (error) {
           console.log("Somethings went wrong when updating picture status");
         }
-        const image_data = await fetch(import.meta.env.VITE_IMAGE_DATA_API);
-        const json_image_data = await image_data.json();
+        
+        // const image_data = await fetch(import.meta.env.VITE_IMAGE_DATA_API);
+        // const json_image_data = await image_data.json();
 
-        const annotations = json_image_data.line_annotations;
-        const junctions = json_image_data.junctions;
-        const filename = json_image_data.filename;
-        const edge_positive = json_image_data.edges_positive;
+        // const annotations = json_image_data.line_annotations;
+        // const junctions = json_image_data.junctions;
+        // const filename = json_image_data.filename;
+        // const edge_positive = json_image_data.edges_positive;
 
-        setImageFileName(filename);
-        setCurrentImageJunctions(junctions);
-        setCurrentImageEdgePositives(edge_positive);
-        setCurrentImageAnnotations(annotations);
+        // setImageFileName(filename);
+        // setCurrentImageJunctions(junctions);
+        // setCurrentImageEdgePositives(edge_positive);
+        // setCurrentImageAnnotations(annotations);
 
-        const response = await fetch(
-          `${import.meta.env.VITE_IMAGE_API}${filename}`
-        );
-        const image = await response.blob();
+        // const response = await fetch(
+        //   `${import.meta.env.VITE_IMAGE_API}${filename}`
+        // );
+        // const image = await response.blob();
 
-        setCurrentImageURL(URL.createObjectURL(image));
+        // setCurrentImageURL(URL.createObjectURL(image));
 
         setIsLoading(false);
       } catch (error) {
         console.error("Error fetching image data:", error);
       }
+      navigate("/save");
     } else {
       alert("You must annotate all lines before saving.");
     }
@@ -305,13 +307,13 @@ function AnnotationTool() {
         <div className="line-buttons w-2/5 flex justify-center  space-x-24">
           <button
             onClick={handlePreviousLine}
-            className="px-4 py-2 bg-gray-500 text-white rounded"
+            className="px-4 py-2 bg-gray-500 hover:bg-gray-800 text-white rounded"
           >
             Previous Line
           </button>
           <button
             onClick={handleNextLine}
-            className="px-4 py-2 bg-yellow-600 text-white rounded"
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-800 text-white rounded"
           >
             Next Line
           </button>
@@ -319,7 +321,7 @@ function AnnotationTool() {
         <div className="action-buttons w-3/5 flex justify-center space-x-24">
           <button
             onClick={handleSave}
-            className="px-7 py-2 bg-green-500 text-white rounded"
+            className="px-7 py-2 bg-green-500 hover:bg-green-800 text-white rounded"
           >
             Save
           </button>
