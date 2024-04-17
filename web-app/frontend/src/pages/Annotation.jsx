@@ -104,11 +104,11 @@ function AnnotationTool() {
   };
 
   const allLinesAreAnnotated = async () => {
-    // for (let i = 0; i < currentImageAnnotations.length; i++) {
-    //   if (currentImageAnnotations[i] == 0) {
-    //     return false;
-    //   }
-    // }
+    for (let i = 0; i < currentImageAnnotations.length; i++) {
+      if (currentImageAnnotations[i] == 0) {
+        return false;
+      }
+    }
     return true;
   };
   const handleSave = async () => {
