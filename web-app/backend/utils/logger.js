@@ -26,7 +26,7 @@ class Logger {
   }
   log(...texts) {
     const message = texts.slice(1).join(" ") + "\n";
-    fs.appendFile("log.txt", message, (err) => {
+    fs.appendFile("../log.txt", message, (err) => {
       if (err) {
         console.error("Failed to write to file", err);
       } else {

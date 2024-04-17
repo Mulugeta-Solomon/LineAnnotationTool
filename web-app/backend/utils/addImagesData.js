@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { readFile } = require("fs/promises");
 const path = require("path");
+const {logger} = require("./logger");
 require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 
 const imageDataSchema = new mongoose.Schema({
@@ -26,7 +27,7 @@ const MongoImage = mongoose.model("image", imageSchema);
 async function execute() {
   try {
     await mongoose.connect(process.env.DATABASE);
-    console.log("Database connected!");
+    logger.success("Database connected!");
     const data = await readFile("train.json", "utf8");
     const jsonData = JSON.parse(data);
     const all_images = jsonData.length;
@@ -51,13 +52,15 @@ async function execute() {
       });
       await image.save();
 
-      console.log(`Added image ${i+1}`);
+      logger.success(`Added image ${i+1}`);
     }
   } catch (err) {
-    console.error("Error:", err);
+    logger.error("Something went wrong when uploading images");
+    logger.realError(err);
   } 
   finally{
     mongoose.disconnect()
+    logger.success("Disconnected Database")
   }
 }
 execute();
