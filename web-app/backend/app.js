@@ -9,13 +9,15 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-try {
-  await mongoose.connect(process.env.DATABASE)
-  logger.success("Database connected!")
-} catch (error) {
-  logger.error("Something went wrong when retrieving image data.");
-  logger.realError(error);
-}
+
+mongoose.connect(process.env.DATABASE)
+  .then(() => {
+    logger.success("Database connected!");
+  })
+  .catch((error) => {
+    logger.error("Something went wrong when retrieving image data.");
+    logger.realError(error);
+  });
 
 app.get("/image_data", async (request, response) => {
   logger.info("Image data requested.")

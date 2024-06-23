@@ -12,6 +12,9 @@ function Welcome() {
             Code of Conduct
           </h2>
           <Rule
+            inputText={"First Annotate the Environment."}
+          ></Rule>
+          <Rule
             inputText={"Select the type of annotation for each line."}
           ></Rule>
           <Rule inputText={"Please try to be as accurate as possible."}></Rule>

@@ -10,9 +10,9 @@ async function execute() {
   await mongoose.connect(process.env.DATABASE);
   logger.success("Connected to Mongodb");
   const image_datas = mongoose.connection.db.collection("image_datas");
-  const imagedata = await image_datas.find({ status: "in_progress" }).toArray();
+  // const imagedata = await image_datas.find({ status: "in_progress" }).toArray();
   // const imagedata = await image_datas.find({ status: "not_annotated" }).toArray();
-  // const imagedata = await image_datas.find({ status: "annotated" }).toArray();
+  const imagedata = await image_datas.find({ status: "annotated" }).toArray();
 
 
   // Write the documents to a JSON file

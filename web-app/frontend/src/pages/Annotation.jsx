@@ -103,6 +103,20 @@ function AnnotationTool() {
     setEdgeAnnotation(null);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "n" || event.key === "N" || event.key === "ArrowRight" || event.key ==="D" || event.key === "d" || event.key === "x" || event.key === "X" ) {
+        handleNextLine();
+      } else if (event.key === "v" || event.key === "V" || event.key === "ArrowLeft" || event.key === "A" || event.key === "a" || event.key === "z" || event.key === "Z") {
+        handlePreviousLine();
+      } 
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [handleNextLine, handlePreviousLine]);
+
   const allLinesAreAnnotated = async () => {
     for (let i = 0; i < currentImageAnnotations.length; i++) {
       if (currentImageAnnotations[i] == 0) {
@@ -112,8 +126,8 @@ function AnnotationTool() {
     return true;
   };
   const handleSave = async () => {
-    setIsLoading(true);
     if (await allLinesAreAnnotated()) {
+      setIsLoading(true);
       try {
         // upload image data
         try {
