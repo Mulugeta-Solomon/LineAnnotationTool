@@ -48,7 +48,7 @@ function AnnotationTool() {
       const response = await fetch(
         `${import.meta.env.VITE_IMAGE_API}${filename}`
       );
-      
+
       const image = await response.blob();
 
       setCurrentImageURL(URL.createObjectURL(image));
@@ -104,12 +104,30 @@ function AnnotationTool() {
   };
 
   useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === "n" || event.key === "N" || event.key === "ArrowRight" || event.key ==="D" || event.key === "d" || event.key === "x" || event.key === "X" ) {
-        handleNextLine();
-      } else if (event.key === "v" || event.key === "V" || event.key === "ArrowLeft" || event.key === "A" || event.key === "a" || event.key === "z" || event.key === "Z") {
-        handlePreviousLine();
-      } 
+    const handleKeyDown = async (event) => {
+      if (
+        event.key === "n" ||
+        event.key === "N" ||
+        event.key === "ArrowRight" ||
+        event.key === "D" ||
+        event.key === "d" ||
+        event.key === "x" ||
+        event.key === "X"
+      ) {
+        await handleNextLine();
+      } else if (
+        event.key === "v" ||
+        event.key === "V" ||
+        event.key === "ArrowLeft" ||
+        event.key === "A" ||
+        event.key === "a" ||
+        event.key === "z" ||
+        event.key === "Z"
+      ) {
+        await handlePreviousLine();
+      } else if (event.key === "s" || event.key === "S") {
+        await handleSave();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => {
@@ -134,7 +152,7 @@ function AnnotationTool() {
           const data = {
             filename: imageFileName,
             annotations: currentImageAnnotations,
-            image_annotation:isIndoor
+            image_annotation: isIndoor,
           };
           await fetch(import.meta.env.VITE_UPLOAD_API, {
             method: "POST",
@@ -146,7 +164,7 @@ function AnnotationTool() {
         } catch (error) {
           console.log("Somethings went wrong when updating picture status");
         }
-        
+
         // const image_data = await fetch(import.meta.env.VITE_IMAGE_DATA_API);
         // const json_image_data = await image_data.json();
 
