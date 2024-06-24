@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-
-
 import sys
 import os
 import json
@@ -30,7 +28,7 @@ class LineAnnotationTool(QMainWindow):
         self.json_data = None
         self.image_data_cache = {} # cache for storing image data
 
-        self.annotations = {}  # filename: {edge_annotation:[len(lines)], environment_annoation:int}
+        self.annotations = {}  # filename: {edge_annotation:[None * len(lines)], environment_annoation:int}
 
         self.annotation_colors = {
             "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
@@ -215,9 +213,6 @@ class LineAnnotationTool(QMainWindow):
 
         self.lineAnndropDown.activated.connect(self.save_annotation)
         self.lineAnndropDown.currentIndexChanged.connect(self.onAnnotationSelected)
-        
-        # update_line_color = partial(self.update_line_color, self.lineAnndropDown.currentIndex())
-        # self.lineAnndropDown.currentIndexChanged.connect(update_line_color)
 
         self.Save.clicked.connect(self.save_file)
 
@@ -284,16 +279,27 @@ class LineAnnotationTool(QMainWindow):
         folder_name = QFileDialog.getExistingDirectory(self, "Select a Folder")
         if folder_name:
             self.folderPath.setText(folder_name)
-            self.filePath.setText("No File Selected")
-
+    
+    def select_file(self):
+        options = QFileDialog.Options()
+        file_name, _ = QFileDialog.getOpenFileName(self, "Select the JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
+        if file_name:
+            self.filePath.setText(file_name)
+            self.json_data = self.load_json(file_name)
+        else:
+            self.filePath.setText("File not Selected")
+        
+    def load_json(self, file_name):
+        with open(file_name, 'r') as file:
+            data = json.load(file)
+        return data
+    
     def load_image(self):
         self.nextLine.setEnabled(False)
         self.previousLine.setEnabled(False)
-        #self.next_image.setEnabled(False) # uncomment it when a method for Image annotation done.
         folder_name = self.folderPath.text()
-
         
-        if folder_name not in ["", "No Folder Selected"]:
+        if folder_name != "No Folder Selected":
             # Getting a list of all the image files in the selected folder
             try:
                 self.image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
@@ -306,7 +312,7 @@ class LineAnnotationTool(QMainWindow):
                 else:
                     self.imageViewer.setText("No image files in the selected folder!")
                 
-                self._annotation()
+                self.create_annotation_file()
             
             except Exception as err:
                 self.imageViewer.setText(f"Error: {err}")
@@ -314,7 +320,7 @@ class LineAnnotationTool(QMainWindow):
         else:
             self.imageViewer.setText("Please select a folder first!")
 
-    def _annotation(self):
+    def create_annotation_file(self):
         for image in self.image_files:
             if image not in self.annotations:
                 image_data = self._get_image_data(image)
@@ -326,13 +332,108 @@ class LineAnnotationTool(QMainWindow):
         if 0 <= index < len(self.image_files):
             folder_name = self.folderPath.text()
             image_path = os.path.join(folder_name, self.image_files[index])
-            #print(f"Loading image from: {image_path}")
-            pixmap = QPixmap(image_path)
+            
+            # Lazy loading and efficient handling
+            pixmap = QPixmap()
+            if not pixmap.load(image_path):
+                self.imageViewer.setText("Failed to load image!")
+                return
+
+            # Scale pixmap to fit the viewer
             self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
             self.imageName.setText(self.image_files[index])
         else:
             self.imageViewer.setText("No image to display!")
+
+
+    def load_line(self):
+
+        self.line_files = {}
+        if not hasattr(self, 'json_data') or not self.json_data:
+            return self.filePath.setText("File not Selected")
+        
+        for image_name in self.image_files:
+            image_data = self._get_image_data(image_name)
+            junctions = image_data['junctions']
+            edges = image_data['edges_positive']
+            self.line_files[image_name] = {'junctions': junctions, 'edges_positive': edges}
+        
+        self.init_pixmap() # Initialize or load the pixmap
+        self.draw_line() 
     
+    def init_pixmap(self):
+        # Initialize the pixmap for the current image if it has not been created yet
+        if not hasattr(self, 'pixmap') or self.pixmap is None:
+            current_image_name = self.imageName.text()
+            folder_name = self.folderPath.text()
+            image_path = os.path.join(folder_name, current_image_name)
+            self.pixmap = QPixmap(image_path)
+            #self.imageViewer.setPixmap(self.pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+
+    def draw_line(self):
+
+        current_image_name = self.imageName.text()
+
+        # Draw lines on the current image
+        folder_name = self.folderPath.text()
+        image_path = os.path.join(folder_name, current_image_name)
+    
+        painter = QPainter(self.pixmap)
+        
+        annotations = self.annotations.get(current_image_name, {})
+        lineannotation = annotations.get('lineannotation', [])
+        imageannotation = annotations.get('imageannotation')
+
+        junctions = self.line_files[current_image_name]['junctions']
+        edges = self.line_files[current_image_name]['edges_positive'][self.current_line_index]
+
+        # Determine color based on annotation
+        current_annotation = lineannotation[self.current_line_index] 
+        print(f"Current annotation: {current_annotation}") # for debugging 
+
+        self.line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
+
+        # Set the color for the line
+        pen = QPen(self.line_color)
+        pen.setWidth(2)
+        painter.setPen(pen)
+
+        # Draw the specific line
+        start_point, end_point = junctions[edges[0]], junctions[edges[1]]
+        p1 = QPointF(start_point[0], start_point[1])
+        p2 = QPointF(end_point[0], end_point[1])
+        painter.drawLine(p1, p2)
+            
+        # Set the color for the junction points
+        pen = QPen(QColor(52, 255, 236))  # RGB for blue color
+        brush = QBrush(QColor(52, 255, 236)) 
+        painter.setPen(pen)
+        painter.setBrush(brush)
+        radius = 2  # Set the radius for the circle
+        # Draw the junction points
+
+        edges_to_draw = set()
+
+        for index, edge in enumerate(edges):
+            if index > self.current_line_index:
+                break
+            edges_to_draw.add(edge)
+
+        # Draw only the selected junction points
+        for idx in edges_to_draw:
+            junction = junctions[idx]
+            painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
+        
+
+        painter.end()
+
+        # Display the image with the overlayed lines
+        self.imageViewer.setPixmap(self.pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+        self.lineProgressBar()
+        self.nextLine.setEnabled(True)
+        self.previousLine.setEnabled(True)
+
+
     def onAnnotationSelected(self):  # this method need a revision 
         if self.lineAnndropDown.currentText():
             self.nextLine.setEnabled(True)
@@ -392,14 +493,12 @@ class LineAnnotationTool(QMainWindow):
             
 
     def next_image(self):
-        #self.check_annotation_completeness() # call error handling 
-        #self.annotations[self.imageName.text()] = []
 
         #Load the next image in the directory
         if self.current_image_index < len(self.image_files) - 1:
             self.current_image_index += 1
             self.current_line_index = 0
-            self.load_line()
+            self.draw_line()
             self.show_image(self.current_image_index)
             self.imageProgressBar()
         else:
@@ -410,12 +509,12 @@ class LineAnnotationTool(QMainWindow):
         self.check_annotation_completeness()
 
     def previous_image(self):
-        #self.annotations[self.imageName.text()] = []
+
         #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.current_line_index = 0
-            self.load_line()
+            self.draw_line()
             self.show_image(self.current_image_index)
             self.imageProgressBar()
         else:
@@ -428,102 +527,6 @@ class LineAnnotationTool(QMainWindow):
         self.progressBarImage.setValue(self.current_image_index + 1)
         self.progImage.setText(f"{self.current_image_index + 1} of {len(self.image_files)} images annotated")
 
-    def select_file(self):
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "Select the JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
-        if file_name:
-            self.filePath.setText(file_name)
-            self.json_data = self.load_json(file_name)
-        else:
-            self.filePath.setText("File not Selected")
-    
-    def load_json(self, file_name):
-        with open(file_name, 'r') as file:
-            data = json.load(file)
-        return data
-    
-    def load_line(self):
-        # This method will extract the required info for the current image and draw the lines.
-        current_image_name = self.imageName.text()
-       
-        image_data = self._get_image_data(current_image_name)
-        if not image_data:
-            return self.filePath.setText("File not Selected")
-
-        junctions = image_data['junctions']
-        edges = image_data['edges_positive']
-
-        # Draw lines on the current image
-        folder_name = self.folderPath.text()
-        image_path = os.path.join(folder_name, current_image_name)
-        pixmap = QPixmap(image_path)
-        painter = QPainter(pixmap)
-
-        #if current_image_name not in self.annotations: # something is not right with this line of code 
-         #   self.annotations[current_image_name] = [None] * len(edges)
-        
-        annotations = self.annotations.get(current_image_name, {})
-        lineannotation = annotations.get('lineannotation', [])
-        imageannotation = annotations.get('imageannotation')
-
-        for i in range(self.current_line_index + 1):
-            edge = edges[i]
-            # Determine color based on annotation
-            current_annotation = lineannotation[i] 
-            print(f"Current annotation: {current_annotation}") # for debugging 
-
-            self.line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
-
-            # Set the color for the line
-            pen = QPen(self.line_color)
-            pen.setWidth(2)
-            painter.setPen(pen)
-
-            # Draw the specific line
-            start_point, end_point = junctions[edge[0]], junctions[edge[1]]
-            p1 = QPointF(start_point[0], start_point[1])
-            p2 = QPointF(end_point[0], end_point[1])
-            painter.drawLine(p1, p2)
-            
-            
-        
-        # Set the color for the junction points
-        pen = QPen(QColor(52, 255, 236))  # RGB for blue color
-        brush = QBrush(QColor(52, 255, 236)) 
-        painter.setPen(pen)
-        painter.setBrush(brush)
-        radius = 2  # Set the radius for the circle
-
-        junctions_to_draw = set()
-
-        for index, edge in enumerate(edges):
-            if index > self.current_line_index:
-                break
-            junctions_to_draw.add(edge[0])
-            junctions_to_draw.add(edge[1])
-
-        # Draw only the selected junction points
-        for junction_index in junctions_to_draw:
-            junction = junctions[junction_index]
-            painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
-
-        painter.end()
-
-        # Display the image with the overlayed lines
-        self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
-        self.lineProgressBar()
-        self.nextLine.setEnabled(True)
-        self.previousLine.setEnabled(True)
-    
-    # def update_line_color(self, index):
-    #     # Update the line color based on the selected class
-    #     selected_class = self.lineAnndropDown.itemText(index)
-    #     self.line_color = self.annotation_colors.get(selected_class, QColor(255, 165, 0))  # Default color if class not found
-
-    #     # Redraw the line with the new color
-    #     self.load_line()
-
-    
     def next_line(self):
        
         current_image_name = self.imageName.text()
@@ -540,7 +543,7 @@ class LineAnnotationTool(QMainWindow):
 
             self.lineAnndropDown.setCurrentText("Select Line Class")
             self.imageAnndropDown.setCurrentText("Select Image Class")    
-            self.load_line()
+            self.draw_line()
             self.lineProgressBar()
      
 
@@ -556,13 +559,13 @@ class LineAnnotationTool(QMainWindow):
         if self.current_line_index >0:
             self.current_line_index -= 1
             self.lineAnndropDown.setCurrentText("Select Line Class")
-            self.load_line()
+            self.draw_line()
             self.previousLine.setEnabled(self.current_line_index > 0)
         else:
             self.previousLine.setEnabled(False)
             
         # Disable the nextLine button since we've removed the last annotation
-        self.nextLine.setEnabled(False)
+        # self.nextLine.setEnabled(False)
 
         #self.load_line()
         self.lineProgressBar()
