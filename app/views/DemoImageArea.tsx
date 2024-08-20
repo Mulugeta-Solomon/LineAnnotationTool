@@ -69,7 +69,6 @@ const DemoImageArea = () => {
 
   return (
     <div className="order-1 sm:order-2 w-3/5 h-full py-10 flex flex-col justify-center items-center relative">
-      <Navbar />
       <div className="flex flex-col justify-center items-center w-full h-full relative">
         {isLoading && (
           <div className="absolute inset-0 w-full h-full bg-gray-500 bg-opacity-50 flex justify-center items-center z-50">
