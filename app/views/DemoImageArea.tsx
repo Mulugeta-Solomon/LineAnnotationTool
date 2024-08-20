@@ -36,6 +36,7 @@ const DemoImageArea = () => {
       try {
         const response = await fetch(`/${image}.json`);
         if (!response.ok) throw new Error("Network response was not ok");
+        await delay(2000);
 
         const json_image_data = await response.json();
 
@@ -47,7 +48,6 @@ const DemoImageArea = () => {
           () => 0
         );
 
-        await delay(2000);
         const currentImageURL = `/${image}.png`;
 
         dispatch(updateImageFileName(filename));
