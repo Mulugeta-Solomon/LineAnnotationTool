@@ -2,604 +2,768 @@
 import sys
 import os
 import json
-from PyQt5.QtWidgets import QVBoxLayout, QMainWindow, QApplication, QProgressBar, QComboBox, QWidget, QHBoxLayout, QFrame, QLabel, QPushButton
-from PyQt5.QtCore import QRect, QCoreApplication, QMetaObject, QPointF, Qt
-from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush
-from PyQt5.QtWidgets import QFileDialog
-from functools import partial
+
+from PyQt5.QtCore import Qt, QPointF, pyqtSignal, QTimer
+from PyQt5.QtGui import QPixmap, QPainter, QPen, QColor, QBrush, QPalette
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget,
+    QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
+    QProgressBar, QFileDialog, QButtonGroup, QRadioButton, QGroupBox,
+    QFrame, QSplitter, QFormLayout, QStyleFactory,
+    QSpacerItem, QSizePolicy
+)
 
 
-SCALE_FACTOR = 2
-# Scaling function for QRect values
-def scaleRect(rect):
-    return QRect(int(rect.x() * SCALE_FACTOR),
-                 int(rect.y() * SCALE_FACTOR),
-                 int(rect.width() * SCALE_FACTOR),
-                 int(rect.height() * SCALE_FACTOR))
-
-
-class LineAnnotationTool(QMainWindow):
-
+###############################################################################
+# 1. AnnotationLogic
+###############################################################################
+class AnnotationLogic:
     def __init__(self):
-        super(LineAnnotationTool, self).__init__()
+        self.json_data = []
         self.image_files = []
         self.current_image_index = -1
         self.current_line_index = 0
-        self.json_data = None
-        self.image_data_cache = {} # cache for storing image data
+        # { filename: {"lineannotation": [...], "environment": None/"Indoor Environment"/"Outdoor Environment"} }
+        self.annotations = {}
+        self.image_data_cache = {}
 
-        self.annotations = {}  # filename: {edge_annotation:[None * len(lines)], environment_annoation:int}
+        # Classes and their colors
+        self.line_annotation_classes = [
+            "Horizontal Upper Edge (HUE)",
+            "Wall Edge (WE)",
+            "Horizontal Lower Edge (HLE)",
+            "Door Edge (DE)",
+            "Window Edge (WndE)",
+            "Miscellaneous Objects (MO)"
+        ]
 
+        # PyQt color objects (used in the viewer)
         self.annotation_colors = {
-            "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),  # Red  # Ceilings and Roofs
-            "Wall Edge (WE)": QColor(0, 255, 0),  # Green # Any edge (vertical or horizontal) found on walls
-            "Horizontal Lower Edge (HLE)": QColor(0, 0, 255),  # Blue # Floors and Foundation Edges
-            "Door Edge (DE)": QColor(255, 255, 0),  # Yellow  # Edges around doors, both interior and exterior
-            "Window Edge (WndE)": QColor(255, 0, 255),  # Magenta  # Edges around windows
-            "Miscellaneous Objects (MO)": QColor(0, 255, 255)   # Cyan # Any object or covered by the above categories
+            "Horizontal Upper Edge (HUE)": QColor(255, 0, 0),
+            "Wall Edge (WE)": QColor(0, 255, 0),
+            "Horizontal Lower Edge (HLE)": QColor(0, 0, 255),
+            "Door Edge (DE)": QColor(255, 255, 0),
+            "Window Edge (WndE)": QColor(255, 0, 255),
+            "Miscellaneous Objects (MO)": QColor(0, 255, 255)
         }
-        self.image_annotation_var = ['Indoor Environment', 'Outdoor Environment']
-        self.line_annotation_var = ["Horizontal Upper Edge (HUE)",  "Wall Edge (WE)", "Horizontal Lower Edge (HLE)", "Door Edge (DE)",  "Window Edge (WndE)", "Miscellaneous Objects (MO)"]
-        self.initUI(self)
 
-    def initUI(self, MainWindow):
-        MainWindow.setObjectName("LineAnnotationTool")
-        MainWindow.resize(int(1015 * SCALE_FACTOR), int(596 * SCALE_FACTOR))
+        # Hex color strings (used for radio-button stylesheets)
+        self.annotation_colors_hex = {
+            "Horizontal Upper Edge (HUE)": "#FF0000",
+            "Wall Edge (WE)": "#00FF00",
+            "Horizontal Lower Edge (HLE)": "#0000FF",
+            "Door Edge (DE)": "#FFFF00",
+            "Window Edge (WndE)": "#FF00FF",
+            "Miscellaneous Objects (MO)": "#00FFFF"
+        }
 
-        self.centralwidget = QWidget(self)
-        self.centralwidget.setObjectName("centralwidget")
-        
-        self.horizontalLayout = QHBoxLayout(self.centralwidget)
-        self.horizontalLayout.setObjectName("horizontalLayout")
-        
-        self.frame = QFrame(self.centralwidget)
-        self.frame.setEnabled(True)
-        self.frame.setFrameShape(QFrame.StyledPanel)
-        self.frame.setFrameShadow(QFrame.Raised)
-        self.frame.setObjectName("frame")
-        
-        self.verticalLayout = QVBoxLayout(self.frame)
-        self.verticalLayout.setObjectName("verticalLayout")
-        
-        self.frame_5 = QFrame(self.frame)
-        self.frame_5.setFrameShape(QFrame.StyledPanel)
-        self.frame_5.setFrameShadow(QFrame.Raised)
-        self.frame_5.setObjectName("frame_5")
+    def load_json_file(self, file_path):
+        with open(file_path, 'r') as f:
+            self.json_data = json.load(f)
 
-        self.folderPath = QLabel(self.frame_5)
-        self.folderPath.setGeometry(scaleRect(QRect(26, 18, 131, 37)))
-        self.folderPath.setObjectName("folderPath")
-        self.filePath = QLabel(self.frame_5)
-        self.filePath.setGeometry(scaleRect(QRect(26, 63, 131, 37)))
-        self.filePath.setObjectName("filePath")
-        
-        self.selectFolder = QPushButton(self.frame_5)
-        self.selectFolder.setGeometry(scaleRect(QRect(184, 18, 109, 37)))
-        self.selectFolder.setObjectName("selectFolder")
-        
-        self.selectFile = QPushButton(self.frame_5)
-        self.selectFile.setGeometry(scaleRect(QRect(184, 63, 109, 37)))
-        self.selectFile.setObjectName("selectFile")
-        
-        self.loadImage = QPushButton(self.frame_5)
-        self.loadImage.setGeometry(scaleRect(QRect(66, 118, 99, 37)))
-        self.loadImage.setObjectName("loadImage")
-        
-        self.loadLine = QPushButton(self.frame_5)
-        self.loadLine.setGeometry(scaleRect(QRect(248, 118, 109, 37)))
-        self.loadLine.setObjectName("loadLine")
-        
-        self.verticalLayout.addWidget(self.frame_5)
-        self.frame_6 = QFrame(self.frame)
-        self.frame_6.setFrameShape(QFrame.StyledPanel)
-        self.frame_6.setFrameShadow(QFrame.Raised)
-        self.frame_6.setObjectName("frame_6")
-        
-        self.lineAnnotation = QLabel(self.frame_6)
-        self.lineAnnotation.setGeometry(scaleRect(QRect(45, 50, 120, 31)))
-        self.lineAnnotation.setObjectName("lineAnnotation")
-        
-        self.lineAnndropDown = QComboBox(self.frame_6)
-        self.configureComboBox(self.lineAnndropDown, "Select Line Annotation Label")
-        
-        self.imageAnnotation = QLabel(self.frame_6)
-        self.imageAnnotation.setGeometry(scaleRect(QRect(250, 50, 180, 31)))
-        self.imageAnnotation.setObjectName("imageAnnotation")
-        
-        self.imageAnndropDown = QComboBox(self.frame_6)
-        self.imageAnndropDown.setGeometry(scaleRect(QRect(250, 110, 160, 31)))
-        self.imageAnndropDown.setEditable(True)
-        self.imageAnndropDown.setObjectName("imageAnndropDown")
-        for i in range(len(self.image_annotation_var)):
-            self.imageAnndropDown.addItem(self.image_annotation_var[i])
-        lineEdit = self.imageAnndropDown.lineEdit()
-        if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
-            lineEdit.setReadOnly(True)  
-            lineEdit.setAlignment(Qt.AlignCenter)
-            lineEdit.setPlaceholderText("Select Image Class")
-
-        
-        self.verticalLayout.addWidget(self.frame_6)
-        self.frame_7 = QFrame(self.frame)
-        self.frame_7.setFrameShape(QFrame.StyledPanel)
-        self.frame_7.setFrameShadow(QFrame.Raised)
-        self.frame_7.setObjectName("frame_7")
-        
-        self.progressBarLine = QProgressBar(self.frame_7)
-        self.progressBarLine.setGeometry(scaleRect(QRect(10, 52, 289, 26)))
-        self.progressBarLine.setProperty("value", 0)
-        self.progressBarLine.setObjectName("progressBarLine")
-        
-        self.Save = QPushButton(self.frame_7)
-        self.Save.setGeometry(scaleRect(QRect(315, 98, 87, 44)))
-        self.Save.setObjectName("Save")
-        
-        self.progressBarImage = QProgressBar(self.frame_7)
-        self.progressBarImage.setGeometry(scaleRect(QRect(10, 112, 289, 26)))
-        self.progressBarImage.setProperty("value", 0)
-        self.progressBarImage.setObjectName("progressBarImage")
-        
-        self.progLine = QLabel(self.frame_7)
-        self.progLine.setGeometry(scaleRect(QRect(64, 24, 153, 11)))
-        self.progLine.setObjectName("progLine")
-        
-        self.progImage = QLabel(self.frame_7)
-        self.progImage.setGeometry(scaleRect(QRect(64, 98, 153, 8)))
-        self.progImage.setObjectName("progImage")
-        
-        self.verticalLayout.addWidget(self.frame_7)
-        self.horizontalLayout.addWidget(self.frame)
-        self.frame_2 = QFrame(self.centralwidget)
-        self.frame_2.setFrameShape(QFrame.StyledPanel)
-        self.frame_2.setFrameShadow(QFrame.Raised)
-        self.frame_2.setObjectName("frame_2")
-        self.frame_3 = QFrame(self.frame_2)
-        self.frame_3.setGeometry(scaleRect(QRect(-1, -1, 471, 51)))
-        self.frame_3.setFrameShape(QFrame.StyledPanel)
-        self.frame_3.setFrameShadow(QFrame.Raised)
-        self.frame_3.setObjectName("frame_3")
-        
-        self.imageName = QLabel(self.frame_3)
-        self.imageName.setGeometry(scaleRect(QRect(109, 10, 211, 31)))
-        self.imageName.setObjectName("imageName")
-        
-        self.frame_4 = QFrame(self.frame_2)
-        self.frame_4.setGeometry(scaleRect(QRect(0, 50, 491, 520)))
-        self.frame_4.setFrameShape(QFrame.StyledPanel)
-        self.frame_4.setFrameShadow(QFrame.Raised)
-        self.frame_4.setObjectName("frame_4")
-        
-        self.imageViewer = QLabel(self.frame_4)
-        self.imageViewer.setGeometry(scaleRect(QRect(0, 0, 500, 400)))
-        self.imageViewer.setObjectName("imageViewer")
-        
-        self.previousLine = QPushButton(self.frame_4)
-        self.previousLine.setGeometry(scaleRect(QRect(100, 420, 91, 31)))
-        self.previousLine.setObjectName("previousLine")
-        
-        self.nextLine = QPushButton(self.frame_4)
-        self.nextLine.setGeometry(scaleRect(QRect(330, 420, 91, 31)))
-        self.nextLine.setObjectName("nextLine")
-        
-        self.PreviousImage = QPushButton(self.frame_4)
-        self.PreviousImage.setGeometry(scaleRect(QRect(100, 480, 91, 31)))
-        self.PreviousImage.setObjectName("PreviousImage")
-        self.nextImage = QPushButton(self.frame_4)
-        self.nextImage.setGeometry(scaleRect(QRect(330, 480, 91, 31)))
-        self.nextImage.setObjectName("nextImage")
-        
-        self.buttonsforLine = QLabel(self.frame_4)
-        self.buttonsforLine.setGeometry(scaleRect(QRect(220, 400, 101, 31)))
-        self.buttonsforLine.setObjectName("buttonsforLine")
-        
-        self.buttonsforImage = QLabel(self.frame_4)
-        self.buttonsforImage.setGeometry(scaleRect(QRect(220, 460, 104, 20)))
-        self.buttonsforImage.setObjectName("buttonsforImage")
-        
-        self.horizontalLayout.addWidget(self.frame_2)
-        self.setCentralWidget(self.centralwidget)
-
-        
-        # Connect the functionality
-        self.selectFolder.clicked.connect(self.select_folder)
-        self.loadImage.clicked.connect(self.load_image)
-        self.nextImage.clicked.connect(self.next_image)
-        self.PreviousImage.clicked.connect(self.previous_image)
-
-        self.selectFile.clicked.connect(self.select_file)
-        self.loadLine.clicked.connect(self.load_line)
-        self.nextLine.clicked.connect(self.next_line)
-        self.previousLine.clicked.connect(self.previous_line)
-
-        self.lineAnndropDown.activated.connect(self.save_annotation)
-        self.lineAnndropDown.currentIndexChanged.connect(self.onAnnotationSelected)
-
-        self.Save.clicked.connect(self.save_file)
-
-        self.retranslateUi(MainWindow)
-        QMetaObject.connectSlotsByName(MainWindow)
-
-    def retranslateUi(self, LineAnnotationTool):
-        _translate = QCoreApplication.translate
-        LineAnnotationTool.setWindowTitle(_translate("LineAnnotationTool", "Line Annotation Tool"))
-        self.folderPath.setText(_translate("LineAnnotationTool", "No Folder Selected"))
-        self.filePath.setText(_translate("LineAnnotationTool", "No File Selected"))
-        self.selectFolder.setText(_translate("LineAnnotationTool", "Select a Folder"))
-        self.selectFile.setText(_translate("LineAnnotationTool", "Select the JSON File"))
-        self.loadImage.setText(_translate("LineAnnotationTool", "Load Image"))
-        self.loadLine.setText(_translate("LineAnnotationTool", "Load Line"))
-        self.lineAnnotation.setText(_translate("LineAnnotationTool", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:600;\">Edge Annotation </span></p></body></html>"))
-        self.lineAnndropDown.setCurrentText(_translate("LineAnnotationTool", "Select Edge Label"))
-        self.imageAnnotation.setText(_translate("LineAnnotationTool", "<html><head/><body><p><span style=\" font-size:12pt; font-weight:600;\">Environment Annotation</span></p></body></html>"))
-        self.imageAnndropDown.setCurrentText(_translate("LineAnnotationTool", "Select Environment Label"))
-        self.Save.setText(_translate("LineAnnotationTool", "Save"))
-        self.progLine.setText(_translate("LineAnnotationTool", "Progress Bar For Line In the Image"))
-        self.progImage.setText(_translate("LineAnnotationTool", "Progress Bar for the Image in the Path"))
-        self.imageName.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Image Name</span></p></body></html>"))
-        self.imageViewer.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">No Image Loaded </span></p></body></html>"))
-        self.previousLine.setText(_translate("LineAnnotationTool", "Previous"))
-        self.nextLine.setText(_translate("LineAnnotationTool", "Next"))
-        self.PreviousImage.setText(_translate("LineAnnotationTool", "Previous"))
-        self.nextImage.setText(_translate("LineAnnotationTool", "Next"))
-        self.buttonsforLine.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button For Line </span></p></body></html>"))
-        self.buttonsforImage.setText(_translate("LineAnnotationTool", "<html><head/><body><p align=\"center\"><span style=\" font-size:10pt; font-weight:600;\">Button for Image</span></p></body></html>"))
-
-    def configureComboBox(self, comboBox, placeholderText):
-        if comboBox == self.lineAnndropDown:
-            comboBox.setGeometry(scaleRect(QRect(15, 110, 170, 31)))
-            comboBox.setEditable(True)
-            comboBox.setObjectName("lineAnndropDown")
-
-            for i in range(len(self.line_annotation_var)):
-                comboBox.addItem(self.line_annotation_var[i])
-            
-            lineEdit = comboBox.lineEdit()
-            if lineEdit:  # Ensure the QComboBox has a line edit (it should in editable mode)
-                lineEdit.setReadOnly(True)  
-                lineEdit.setAlignment(Qt.AlignCenter)
-                lineEdit.setPlaceholderText("Select Line Annotation Label")
-
-    
     def _get_image_data(self, image_name):
-        # check if the result is already in the cache
         if image_name in self.image_data_cache:
             return self.image_data_cache[image_name]
-        
-        if not hasattr(self, 'json_data') or not self.json_data:
-            raise Exception("JSON data not loaded!")
-        
-        image_data = [entry for entry in self.json_data if entry['filename'] == image_name]
-        if not image_data:
-            raise Exception("Image data not found in JSON!")
-        
-        self.image_data_cache[image_name] = image_data[0]
-        return image_data[0]
-    
-    def select_folder(self):
-        folder_name = QFileDialog.getExistingDirectory(self, "Select a Folder")
-        if folder_name:
-            self.folderPath.setText(folder_name)
-    
-    def select_file(self):
-        options = QFileDialog.Options()
-        file_name, _ = QFileDialog.getOpenFileName(self, "Select the JSON File", "", "JSON Files (*.json);;All Files (*)", options=options)
-        if file_name:
-            self.filePath.setText(file_name)
-            self.json_data = self.load_json(file_name)
-        else:
-            self.filePath.setText("File not Selected")
-        
-    def load_json(self, file_name):
-        with open(file_name, 'r') as file:
-            data = json.load(file)
-        return data
-    
-    def load_image(self):
-        self.nextLine.setEnabled(False)
-        self.previousLine.setEnabled(False)
-        folder_name = self.folderPath.text()
-        
-        if folder_name != "No Folder Selected":
-            # Getting a list of all the image files in the selected folder
-            try:
-                self.image_files = [f for f in os.listdir(folder_name) if f.endswith(('png', 'jpg', 'jpeg', 'bmp', 'xpm'))]
-                #print(f"Detected images: {self.image_files}")
-                if self.image_files:
-                    self.current_image_index = 0
-                    self.show_image(self.current_image_index)
-                    self.progressBarImage.setMaximum(len(self.image_files))
-                    self.imageProgressBar()
-                else:
-                    self.imageViewer.setText("No image files in the selected folder!")
-                
-                self.create_annotation_file()
-            
-            except Exception as err:
-                self.imageViewer.setText(f"Error: {err}")
-                print(f"Error: {err}")
-        else:
-            self.imageViewer.setText("Please select a folder first!")
+        filtered = [entry for entry in self.json_data if entry['filename'] == image_name]
+        if not filtered:
+            raise ValueError(f"No JSON data found for image '{image_name}'.")
+        self.image_data_cache[image_name] = filtered[0]
+        return filtered[0]
 
-    def create_annotation_file(self):
-        for image in self.image_files:
-            if image not in self.annotations:
-                image_data = self._get_image_data(image)
-                num_lines = len(image_data['edges_positive'])
-                # create a dictionary with lineannotation and imageannotation key inside the the annotation dictionary 
-                self.annotations[image_data['filename']] = {'lineannotation': [None for lineannotation in range(num_lines)], 'imageannotation': None}
-                            
-    def show_image(self, index):
-        if 0 <= index < len(self.image_files):
-            folder_name = self.folderPath.text()
-            image_path = os.path.join(folder_name, self.image_files[index])
-            
-            # Lazy loading and efficient handling
-            pixmap = QPixmap()
-            if not pixmap.load(image_path):
-                self.imageViewer.setText("Failed to load image!")
-                return
+    def initialize_annotations_for_folder(self, folder_path):
+        if not folder_path or not os.path.isdir(folder_path):
+            raise ValueError("Invalid folder selected.")
 
-            # Scale pixmap to fit the viewer
-            self.imageViewer.setPixmap(pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
-            self.imageName.setText(self.image_files[index])
-        else:
-            self.imageViewer.setText("No image to display!")
+        valid_exts = ('.png', '.jpg', '.jpeg', '.bmp', '.xpm')
+        self.image_files = [
+            f for f in os.listdir(folder_path)
+            if f.lower().endswith(valid_exts)
+        ]
+        self.image_files.sort()
 
+        self.current_image_index = 0
+        # Create placeholders for each image if not present
+        for img in self.image_files:
+            if img not in self.annotations:
+                try:
+                    img_data = self._get_image_data(img)
+                    num_lines = len(img_data['edges_positive'])
+                    self.annotations[img] = {
+                        "lineannotation": [None]*num_lines,
+                        "environment": None
+                    }
+                except ValueError:
+                    pass
 
-    def load_line(self):
+    def get_current_image_name(self):
+        if 0 <= self.current_image_index < len(self.image_files):
+            return self.image_files[self.current_image_index]
+        return None
 
-        self.line_files = {}
-        if not hasattr(self, 'json_data') or not self.json_data:
-            return self.filePath.setText("File not Selected")
-        
-        for image_name in self.image_files:
-            image_data = self._get_image_data(image_name)
-            junctions = image_data['junctions']
-            edges = image_data['edges_positive']
-            self.line_files[image_name] = {'junctions': junctions, 'edges_positive': edges}
-        
-        self.init_pixmap() # Initialize or load the pixmap
-        self.draw_line() 
-    
-    def init_pixmap(self):
-        # Initialize the pixmap for the current image if it has not been created yet
-        if not hasattr(self, 'pixmap') or self.pixmap is None:
-            current_image_name = self.imageName.text()
-            folder_name = self.folderPath.text()
-            image_path = os.path.join(folder_name, current_image_name)
-            self.pixmap = QPixmap(image_path)
-            #self.imageViewer.setPixmap(self.pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
+    def get_total_images(self):
+        return len(self.image_files)
 
-    def draw_line(self):
+    def get_current_line_count(self):
+        image_name = self.get_current_image_name()
+        if not image_name:
+            return 0
+        image_data = self._get_image_data(image_name)
+        return len(image_data['edges_positive'])
 
-        current_image_name = self.imageName.text()
+    def set_line_annotation(self, line_index, annotation_label):
+        image_name = self.get_current_image_name()
+        if image_name and line_index < self.get_current_line_count():
+            self.annotations[image_name]["lineannotation"][line_index] = annotation_label
 
-        # Draw lines on the current image
-        folder_name = self.folderPath.text()
-        image_path = os.path.join(folder_name, current_image_name)
-    
-        painter = QPainter(self.pixmap)
-        
-        annotations = self.annotations.get(current_image_name, {})
-        lineannotation = annotations.get('lineannotation', [])
-        imageannotation = annotations.get('imageannotation')
+    def get_line_annotation(self, line_index):
+        image_name = self.get_current_image_name()
+        if image_name and line_index < self.get_current_line_count():
+            return self.annotations[image_name]["lineannotation"][line_index]
+        return None
 
-        junctions = self.line_files[current_image_name]['junctions']
-        edges = self.line_files[current_image_name]['edges_positive'][self.current_line_index]
+    def set_image_environment(self, environment_label):
+        image_name = self.get_current_image_name()
+        if image_name:
+            self.annotations[image_name]["environment"] = environment_label
 
-        # Determine color based on annotation
-        current_annotation = lineannotation[self.current_line_index] 
-        print(f"Current annotation: {current_annotation}") # for debugging 
+    def get_image_environment(self):
+        image_name = self.get_current_image_name()
+        if image_name:
+            return self.annotations[image_name]["environment"]
+        return None
 
-        self.line_color = self.annotation_colors.get(current_annotation, QColor(255, 165, 0))  # Default color if annotation not found
+    def get_annotated_line_count(self):
+        image_name = self.get_current_image_name()
+        if not image_name:
+            return 0
+        line_ann = self.annotations[image_name]["lineannotation"]
+        return sum(1 for ann in line_ann if ann is not None)
 
-        # Set the color for the line
-        pen = QPen(self.line_color)
-        pen.setWidth(2)
-        painter.setPen(pen)
-
-        # Draw the specific line
-        start_point, end_point = junctions[edges[0]], junctions[edges[1]]
-        p1 = QPointF(start_point[0], start_point[1])
-        p2 = QPointF(end_point[0], end_point[1])
-        painter.drawLine(p1, p2)
-            
-        # Set the color for the junction points
-        pen = QPen(QColor(52, 255, 236))  # RGB for blue color
-        brush = QBrush(QColor(52, 255, 236)) 
-        painter.setPen(pen)
-        painter.setBrush(brush)
-        radius = 2  # Set the radius for the circle
-        # Draw the junction points
-
-        edges_to_draw = set()
-
-        for index, edge in enumerate(edges):
-            if index > self.current_line_index:
-                break
-            edges_to_draw.add(edge)
-
-        # Draw only the selected junction points
-        for idx in edges_to_draw:
-            junction = junctions[idx]
-            painter.drawEllipse(QPointF(junction[0], junction[1]), radius, radius)
-        
-
-        painter.end()
-
-        # Display the image with the overlayed lines
-        self.imageViewer.setPixmap(self.pixmap.scaled(self.imageViewer.width(), self.imageViewer.height()))
-        self.lineProgressBar()
-        self.nextLine.setEnabled(True)
-        self.previousLine.setEnabled(True)
-
-
-    def onAnnotationSelected(self):  # this method need a revision 
-        if self.lineAnndropDown.currentText():
-            self.nextLine.setEnabled(True)
-
-    def save_annotation(self):
-        current_image_name = self.imageName.text()  # current image name
-        selected_line_annotation = self.lineAnndropDown.currentText()
-        selected_image_annotation = self.imageAnndropDown.currentText()
-        image_data = self._get_image_data(current_image_name)
-
-        
-        if selected_line_annotation:
-            lineannotation = self.annotations.get(current_image_name, {}).get('lineannotation', [])
-            if len(lineannotation) > self.current_line_index and lineannotation[self.current_line_index] is None:
-                lineannotation[self.current_line_index] = selected_line_annotation
-                self.load_line()
-   
-        if selected_image_annotation:
-            image_annotation = self.annotations.get(current_image_name, {}).get('imageannotation')
-            if image_annotation is None:
-                self.annotations[current_image_name]['imageannotation'] = selected_image_annotation
-
-        # if there is no none value in self.annotations[current_image_name][current_line] then disable the nextLine button
-        annotations = self.annotations.get(current_image_name, {})
-        lineannotation = annotations.get('lineannotation', [])
-        imageannotation = annotations.get('imageannotation')
-
-        if None not in lineannotation and imageannotation is not None:
-            self.nextLine.setEnabled(False) # Disable the next line button since we've reached the maximum number of annotations for this image
-
-
-    def check_annotation_completeness(self): # for error handling
-        # Get the current image name
-        current_image_name = self.imageName.text()
-
-        # Get the number of annotations for the current image
-        annotations = [annotation for annotation in self.annotations[current_image_name]['lineannotation'] if annotation is not None] 
-        annotation_count = len(annotations)
-
-        # Fetch the line data for the current image from the JSON data
-        image_data = self._get_image_data(current_image_name)
-
-        line_count = 0
-        if image_data:
-            line_count = len(image_data['edges_positive'])
-        
-        # Compare the annotation count with the line count
-        if annotation_count == line_count:
-            print("Annotations are complete for the current image.")
-            print(f"Done: Annotation success! {annotation_count} annotations found for {line_count} lines.")
-            print("List of annotations for the current image:", annotations)
-        else:
-            print(f"Error: Annotations incomplete for image {current_image_name}. {annotation_count} annotations found for {line_count} lines.")
-
-        
-        #TODO: Add a check for the image annotation as well
-            
+    def is_current_image_fully_annotated(self):
+        image_name = self.get_current_image_name()
+        if not image_name:
+            return False
+        line_ann = self.annotations[image_name]["lineannotation"]
+        env_ann = self.annotations[image_name]["environment"]
+        if None in line_ann:
+            return False
+        if env_ann is None:
+            return False
+        return True
 
     def next_image(self):
-
-        #Load the next image in the directory
-        if self.current_image_index < len(self.image_files) - 1:
+        """
+        Returns True if we move to next image successfully,
+        otherwise False if the current image is not fully annotated
+        or if we are at the last image.
+        """
+        if not self.is_current_image_fully_annotated():
+            return False
+        if self.current_image_index < self.get_total_images() - 1:
             self.current_image_index += 1
             self.current_line_index = 0
-            self.draw_line()
-            self.show_image(self.current_image_index)
-            self.imageProgressBar()
-        else:
-            self.imageViewer.setText("This is the last image!")
-        
-        self.nextLine.setEnabled(False)
-        self.previousLine.setEnabled(False)
-        self.check_annotation_completeness()
+            return True
+        return False
 
     def previous_image(self):
-
-        #Load the previous image in the directory
         if self.current_image_index > 0:
             self.current_image_index -= 1
             self.current_line_index = 0
-            self.draw_line()
-            self.show_image(self.current_image_index)
-            self.imageProgressBar()
-        else:
-            self.imageViewer.setText("This is the first image!")
-        
-        self.nextLine.setEnabled(False)
-        self.previousLine.setEnabled(False)
-
-    def imageProgressBar(self):
-        self.progressBarImage.setValue(self.current_image_index + 1)
-        self.progImage.setText(f"{self.current_image_index + 1} of {len(self.image_files)} images annotated")
+            return True
+        return False
 
     def next_line(self):
-       
-        current_image_name = self.imageName.text()
-        image_data = self._get_image_data(current_image_name)
-        if self.current_line_index < len(image_data['edges_positive']) - 1:
-            self.current_line_index += 1
-                # Check if you're at the end of the lines for the current image
-            if self.current_line_index == len(self.annotations[self.imageName.text()]):
-                self.nextLine.setEnabled(False)
-            else:
-                # Update the dropdown to reflect the next line's annotation, if it exists
-                self.lineAnndropDown.setCurrentText(self.annotations[self.imageName.text()]["lineannotation"][self.current_line_index])
-            self.previousLine.setEnabled(True)
-
-            self.lineAnndropDown.setCurrentText("Select Line Class")
-            self.imageAnndropDown.setCurrentText("Select Image Class")    
-            self.draw_line()
-            self.lineProgressBar()
-     
+        """
+        Returns True if we successfully move to the next line,
+        otherwise False if current line is unannotated.
+        """
+        if not self.get_line_annotation(self.current_line_index):
+            return False
+        total_lines = self.get_current_line_count()
+        self.current_line_index = (self.current_line_index + 1) % total_lines
+        return True
 
     def previous_line(self):
-        
-        current_image_name = self.imageName.text()
+        """
+        Returns True if we successfully move to the previous line,
+        otherwise False if current line is unannotated.
+        """
+        if not self.get_line_annotation(self.current_line_index):
+            return False
+        total_lines = self.get_current_line_count()
+        self.current_line_index = (self.current_line_index - 1) % total_lines
+        return True
 
-        # Update annotations
-        if current_image_name in self.annotations and self.annotations[current_image_name]["lineannotation"][self.current_line_index] is not None:
-            #self.annotations[current_image_name].pop()  # Remove the last annotation
-            self.annotations[current_image_name]["lineannotation"][self.current_line_index] = None
-        # Move to the previous line
-        if self.current_line_index >0:
-            self.current_line_index -= 1
-            self.lineAnndropDown.setCurrentText("Select Line Class")
-            self.draw_line()
-            self.previousLine.setEnabled(self.current_line_index > 0)
+    def get_junctions_and_edges(self, image_name):
+        data = self._get_image_data(image_name)
+        return data['junctions'], data['edges_positive']
+
+    def save_annotations(self, output_path="annotations_result.json"):
+        with open(output_path, 'w') as fp:
+            json.dump(self.annotations, fp, indent=4)
+
+
+###############################################################################
+# 2. ImageViewer
+#    - Unannotated lines => dashed red with higher frequency => DotLine
+#    - Only the current line shows 2 blue points at its endpoints
+###############################################################################
+class ImageViewer(QWidget):
+    def __init__(self, logic: AnnotationLogic, parent=None):
+        super().__init__(parent)
+        self.logic = logic
+        self._pixmap = QPixmap()
+
+        # Increase the default size to favor the image viewer more
+        self.setMinimumSize(700, 500)
+
+    def set_pixmap(self, pixmap: QPixmap):
+        self._pixmap = pixmap
+        self.update()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        if not self._pixmap.isNull():
+            # Draw image scaled
+            scaled = self._pixmap.scaled(
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+            x = (self.width() - scaled.width()) // 2
+            y = (self.height() - scaled.height()) // 2
+            painter.drawPixmap(x, y, scaled)
+
+            # Then overlay lines
+            self.draw_lines(painter, scaled, x, y)
         else:
-            self.previousLine.setEnabled(False)
-            
-        # Disable the nextLine button since we've removed the last annotation
-        # self.nextLine.setEnabled(False)
+            painter.drawText(self.rect(), Qt.AlignCenter, "No Image Loaded")
 
-        #self.load_line()
-        self.lineProgressBar()
+    def draw_lines(self, painter, scaled_pixmap, offset_x, offset_y):
+        image_name = self.logic.get_current_image_name()
+        if not image_name or self._pixmap.isNull():
+            return
 
-    def lineProgressBar(self):
-        if not hasattr(self, 'json_data'):
-            self.progressBarLine.setValue(0)
-            return self.filePath.setText("File not Selected")
+        try:
+            junctions, edges = self.logic.get_junctions_and_edges(image_name)
+        except ValueError:
+            return
 
-        current_image_name = self.imageName.text()
-        image_data = [entry for entry in self.json_data if entry['filename'] == current_image_name]
-        if not image_data:
-            self.progressBarLine.setValue(0)
-            return self.filePath.setText("File not Selected")
-        
-        # Set the progress bar's maximum value
-        total_lines = len(image_data[0]['edges_positive'])
-        self.progressBarLine.setMaximum(total_lines)
-        
-        # Update the progress bar's value
-        self.progressBarLine.setValue(self.current_line_index + 1)
-        self.progLine.setText(f"{self.current_line_index + 1} of {total_lines} lines annotated")
+        orig_w = self._pixmap.width()
+        orig_h = self._pixmap.height()
+        scaled_w = scaled_pixmap.width()
+        scaled_h = scaled_pixmap.height()
 
-    def save_file(self):
+        def scale_point(pt):
+            px = (pt[0] / orig_w) * scaled_w
+            py = (pt[1] / orig_h) * scaled_h
+            return QPointF(offset_x + px, offset_y + py)
+
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        current_line = self.logic.current_line_index
+
+        for idx, (start_idx, end_idx) in enumerate(edges):
+            line_annot = self.logic.get_line_annotation(idx)
+
+            if line_annot is None:
+                # Unannotated => dashed red with higher frequency => DotLine
+                pen = QPen(QColor(255, 0, 0), 2, Qt.DotLine)
+            else:
+                # Annotated => color from the dictionary, solid
+                color = self.logic.annotation_colors.get(line_annot, QColor(128, 128, 128))
+                width = 3 if idx == current_line else 2
+                pen = QPen(color, width, Qt.SolidLine)
+
+            painter.setPen(pen)
+            p1 = scale_point(junctions[start_idx])
+            p2 = scale_point(junctions[end_idx])
+            painter.drawLine(p1, p2)
+
+        # Draw the two BLUE junction points only for the current line
+        if current_line < len(edges):
+            start_idx, end_idx = edges[current_line]
+            p1 = scale_point(junctions[start_idx])
+            p2 = scale_point(junctions[end_idx])
+
+            painter.setPen(QPen(QColor(0, 0, 255), 2, Qt.SolidLine))
+            painter.setBrush(QBrush(QColor(0, 0, 255), Qt.SolidPattern))
+            radius = 5
+            painter.drawEllipse(p1, radius, radius)
+            painter.drawEllipse(p2, radius, radius)
+
+
+###############################################################################
+# 3. LineAnnotationPanel 
+#    - Color-coded radio buttons with a thin border, filled on press
+###############################################################################
+class LineAnnotationPanel(QWidget):
+    lineAnnotationChanged = pyqtSignal()
+
+    def __init__(self, logic: AnnotationLogic, parent=None):
+        super().__init__(parent)
+        self.logic = logic
+
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        line_box = QGroupBox("Line Annotation")
+        line_layout = QVBoxLayout()
+        line_box.setLayout(line_layout)
+
+        self.line_button_group = QButtonGroup(self)
+        self.line_button_group.setExclusive(True)
+
+        # Create a radio button for each class, with dynamic color-coded style
+        for cls in self.logic.line_annotation_classes:
+            rb = QRadioButton(cls)
+
+            # Get the color in hex form
+            color_hex = self.logic.annotation_colors_hex[cls]
+            # Style: thin border in that color, then fill if checked
+            # Hide the default radio indicator (the circle) by setting width=0
+            style = f"""
+            QRadioButton {{
+                border: 2px solid {color_hex};
+                border-radius: 6px;
+                padding: 6px;
+                margin: 3px;
+                color: #333;
+            }}
+            QRadioButton::indicator {{
+                width: 0px;
+            }}
+            QRadioButton:checked {{
+                background-color: {color_hex};
+                color: #FFFFFF;
+            }}
+            """
+            rb.setStyleSheet(style)
+            line_layout.addWidget(rb)
+            self.line_button_group.addButton(rb)
+
+        # Connect
+        self.line_button_group.buttonClicked.connect(self.on_line_annotation_selected)
+
+        layout.addWidget(line_box)
+        layout.addSpacerItem(QSpacerItem(
+            20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding
+        ))
+
+    def on_line_annotation_selected(self, button):
+        annotation_label = button.text()
+        line_idx = self.logic.current_line_index
+        self.logic.set_line_annotation(line_idx, annotation_label)
+        # Emit signal => immediate redraw
+        self.lineAnnotationChanged.emit()
+
+    def update_selections(self):
+        current_annot = self.logic.get_line_annotation(self.logic.current_line_index)
+        # Uncheck everything first
+        for btn in self.line_button_group.buttons():
+            btn.setChecked(False)
+
+        # Check the one that matches
+        if current_annot:
+            for btn in self.line_button_group.buttons():
+                if btn.text() == current_annot:
+                    btn.setChecked(True)
+                    break
+
+
+###############################################################################
+# 4. MainWindow
+###############################################################################
+class LineAnnotationTool(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Line Annotation Tool - Modern UI")
+
+        # Default bigger window
+        self.resize(1400, 900)
+
+        # Instead of a status bar, use a custom label for ephemeral alerts
+        self.alert_label = QLabel("")
+        self.alert_label.setVisible(False)  # hidden by default
+        self.alert_label.setStyleSheet("""
+            background-color: #F44336;
+            color: #FFFFFF;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-weight: bold;
+        """)
+        # We'll place this at the bottom of the layout (centered)
+
+        QApplication.setStyle(QStyleFactory.create("Fusion"))
+
+        palette = QPalette()
+        palette.setColor(QPalette.Window, QColor(245, 245, 245))
+        palette.setColor(QPalette.WindowText, Qt.black)
+        palette.setColor(QPalette.Base, QColor(255, 255, 255))
+        palette.setColor(QPalette.Button, QColor(230, 230, 230))
+        palette.setColor(QPalette.ButtonText, Qt.black)
+        palette.setColor(QPalette.Highlight, QColor(76, 163, 224))
+        palette.setColor(QPalette.HighlightedText, Qt.white)
+        self.setPalette(palette)
+
+        self.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #AAAAAA;
+                border-radius: 5px;
+                margin-top: 10px;
+            }
+            QGroupBox:title {
+                subcontrol-origin: margin;
+                left: 15px;
+                padding: 0 3px 0 3px;
+            }
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border-radius: 5px;
+                padding: 6px 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QProgressBar {
+                height: 14px;
+                border-radius: 7px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #2196F3;
+                border-radius: 7px;
+            }
+            QLabel {
+                font-size: 12px;
+            }
+        """)
+
+        self.logic = AnnotationLogic()
+
+        # Central widget
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+
+        # We'll use a vertical layout so we can place the alert label at the bottom
+        main_vlayout = QVBoxLayout()
+        central_widget.setLayout(main_vlayout)
+
+        # The top area is a horizontal layout with the QSplitter
+        top_layout = QHBoxLayout()
+        main_vlayout.addLayout(top_layout, stretch=1)
+
+        splitter = QSplitter(Qt.Horizontal)
+        top_layout.addWidget(splitter)
+
+        # Left Panel
+        left_panel = QWidget()
+        left_layout = QVBoxLayout()
+        left_panel.setLayout(left_layout)
+        splitter.addWidget(left_panel)
+
+        # File selection group
+        file_group = QGroupBox("File Selection")
+        file_form = QFormLayout()
+        file_group.setLayout(file_form)
+
+        self.folder_label = QLabel("No Folder Selected")
+        self.select_folder_btn = QPushButton("Select Folder")
+
+        self.file_label = QLabel("No JSON Selected")
+        self.select_file_btn = QPushButton("Select JSON")
+
+        file_form.addRow(self.folder_label, self.select_folder_btn)
+        file_form.addRow(self.file_label, self.select_file_btn)
+
+        # Load images/lines row
+        load_layout = QHBoxLayout()
+        self.load_images_btn = QPushButton("Load Images")
+        self.load_lines_btn = QPushButton("Load Lines")
+        load_layout.addWidget(self.load_images_btn)
+        load_layout.addWidget(self.load_lines_btn)
+        file_form.addRow(load_layout)
+
+        left_layout.addWidget(file_group)
+
+        # Progress group
+        progress_group = QGroupBox("Progress")
+        progress_layout = QVBoxLayout()
+        progress_group.setLayout(progress_layout)
+
+        self.image_progress_label = QLabel("Image Progress: 0/0")
+        self.image_progress = QProgressBar()
+        self.line_progress_label = QLabel("Line Progress: 0/0")
+        self.line_progress = QProgressBar()
+
+        progress_layout.addWidget(self.image_progress_label)
+        progress_layout.addWidget(self.image_progress)
+        progress_layout.addWidget(self.line_progress_label)
+        progress_layout.addWidget(self.line_progress)
+
+        left_layout.addWidget(progress_group)
+
+        # Environment Toggle Group
+        env_group = QGroupBox("Environment")
+        env_layout = QVBoxLayout()
+        env_group.setLayout(env_layout)
+        self.env_toggle = QPushButton("🏠 Indoor Environment")
+        self.env_toggle.setCheckable(True)
+        self.env_toggle.setChecked(False)  # default => Indoor
+        # Beige style:
+        self.env_toggle.setStyleSheet("QPushButton { background-color: #F5F5DC; color: black; }")
+        env_layout.addWidget(self.env_toggle)
+        left_layout.addWidget(env_group)
+
+        # The line annotation panel
+        self.line_panel = LineAnnotationPanel(self.logic)
+        left_layout.addWidget(self.line_panel)
+
+        # Save button
+        self.save_btn = QPushButton("Save Annotations")
+        left_layout.addWidget(self.save_btn)
+
+        # Right Panel for image and nav
+        right_panel = QWidget()
+        right_layout = QVBoxLayout()
+        right_panel.setLayout(right_layout)
+        splitter.addWidget(right_panel)
+
+        # SMALL label for the image name, so the viewer is bigger
+        self.image_name_label = QLabel("No Image Loaded")
+        self.image_name_label.setAlignment(Qt.AlignCenter)
+        # Decrease the height to make the image area bigger
+        self.image_name_label.setFixedHeight(30)
+
+        # The image viewer
+        self.image_viewer = ImageViewer(self.logic)
+        right_layout.addWidget(self.image_viewer, stretch=1)
+        right_layout.addWidget(self.image_name_label, stretch=0)
+
+        # Line nav
+        line_nav_layout = QHBoxLayout()
+        self.prev_line_btn = QPushButton("Prev Line")
+        self.next_line_btn = QPushButton("Next Line")
+        line_nav_layout.addWidget(self.prev_line_btn)
+        line_nav_layout.addWidget(self.next_line_btn)
+        right_layout.addLayout(line_nav_layout)
+
+        # Image nav
+        image_nav_layout = QHBoxLayout()
+        self.prev_image_btn = QPushButton("Prev Image")
+        self.next_image_btn = QPushButton("Next Image")
+        image_nav_layout.addWidget(self.prev_image_btn)
+        image_nav_layout.addWidget(self.next_image_btn)
+        right_layout.addLayout(image_nav_layout)
+
+        # Finally, add the alert_label at the bottom, centered
+        alert_layout = QHBoxLayout()
+        alert_layout.addStretch(1)
+        alert_layout.addWidget(self.alert_label)
+        alert_layout.addStretch(1)
+        main_vlayout.addLayout(alert_layout, stretch=0)
+
+        # Connect signals
+        self.select_folder_btn.clicked.connect(self.select_folder)
+        self.select_file_btn.clicked.connect(self.select_json)
+
+        self.load_images_btn.clicked.connect(self.load_images)
+        self.load_lines_btn.clicked.connect(self.load_lines)
+
+        self.prev_line_btn.clicked.connect(self.prev_line)
+        self.next_line_btn.clicked.connect(self.next_line)
+        self.prev_image_btn.clicked.connect(self.prev_image)
+        self.next_image_btn.clicked.connect(self.next_image)
+
+        self.save_btn.clicked.connect(self.save_annotations)
+
+        # Connect environment toggle
+        self.env_toggle.clicked.connect(self.toggle_environment)
+
+        # Connect line panel signals for immediate redraw
+        self.line_panel.lineAnnotationChanged.connect(self.refresh_viewer)
+
+        self.update_ui_state()
+
+    ###########################################################################
+    # ALERT MESSAGE HELPER
+    ###########################################################################
+    def show_alert(self, message, color="#F44336", timeout=3000):
+        """
+        Shows an alert in self.alert_label with the given background color
+        for `timeout` milliseconds, then hides it automatically.
+        """
+        self.alert_label.setText(message)
+        self.alert_label.setStyleSheet(f"""
+            background-color: {color};
+            color: #FFFFFF;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-weight: bold;
+        """)
+        self.alert_label.setVisible(True)
+
+        # Hide after `timeout` ms
+        QTimer.singleShot(timeout, lambda: self.alert_label.setVisible(False))
+
+    ###########################################################################
+    # ENV TOGGLE LOGIC
+    ###########################################################################
+    def toggle_environment(self):
+        if self.env_toggle.isChecked():
+            # Outdoor
+            self.env_toggle.setText("🌐 Outdoor Environment")
+            self.env_toggle.setStyleSheet("QPushButton { background-color: black; color: white; }")
+            self.logic.set_image_environment("Outdoor Environment")
+        else:
+            # Indoor
+            self.env_toggle.setText("🏠 Indoor Environment")
+            self.env_toggle.setStyleSheet("QPushButton { background-color: #F5F5DC; color: black; }")
+            self.logic.set_image_environment("Indoor Environment")
+
+        self.refresh_viewer()
+
+    ###########################################################################
+    # LOAD / SAVE / NAV
+    ###########################################################################
+    def refresh_viewer(self):
+        self.line_panel.update_selections()
+        self.update_image()
+
+    def select_folder(self):
+        folder_path = QFileDialog.getExistingDirectory(self, "Select a Folder")
+        if folder_path:
+            self.folder_label.setText(folder_path)
+
+    def select_json(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select JSON File", "",
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if file_path:
+            self.file_label.setText(file_path)
+            self.logic.load_json_file(file_path)
+
+    def load_images(self):
+        folder_path = self.folder_label.text()
+        if folder_path == "No Folder Selected":
+            return
+        try:
+            self.logic.initialize_annotations_for_folder(folder_path)
+        except ValueError as e:
+            self.image_name_label.setText(str(e))
+            return
+
+        if self.logic.get_total_images() > 0:
+            self.logic.current_image_index = 0
+            self.update_image()
+        else:
+            self.image_name_label.setText("No images found in folder.")
+        self.update_ui_state()
+
+    def load_lines(self):
+        self.update_image()
+
+    def update_image(self):
+        image_name = self.logic.get_current_image_name()
+        if not image_name:
+            self.image_name_label.setText("No Image Loaded")
+            self.image_viewer.set_pixmap(QPixmap())
+            return
+
+        folder_path = self.folder_label.text()
+        image_path = os.path.join(folder_path, image_name)
+        pixmap = QPixmap(image_path)
+        self.image_viewer.set_pixmap(pixmap)
+        self.image_name_label.setText(image_name)
+
+        # If environment is None, default to Indoor
+        env = self.logic.get_image_environment()
+        if env is None:
+            self.env_toggle.setChecked(False)
+            self.env_toggle.setText("🏠 Indoor Environment")
+            self.env_toggle.setStyleSheet("QPushButton { background-color: #F5F5DC; color: black; }")
+            self.logic.set_image_environment("Indoor Environment")
+        else:
+            if env == "Outdoor Environment":
+                self.env_toggle.setChecked(True)
+                self.env_toggle.setText("🌐 Outdoor Environment")
+                self.env_toggle.setStyleSheet("QPushButton { background-color: black; color: white; }")
+            else:
+                self.env_toggle.setChecked(False)
+                self.env_toggle.setText("🏠 Indoor Environment")
+                self.env_toggle.setStyleSheet("QPushButton { background-color: #F5F5DC; color: black; }")
+
+        self.line_panel.update_selections()
+        self.update_progress_bars()
+
+    def update_progress_bars(self):
+        total_imgs = self.logic.get_total_images()
+        current_idx = self.logic.current_image_index + 1
+        self.image_progress.setMaximum(total_imgs if total_imgs else 1)
+        self.image_progress.setValue(current_idx if total_imgs else 0)
+        self.image_progress_label.setText(f"Image Progress: {current_idx}/{total_imgs}")
+
+        total_lines = self.logic.get_current_line_count()
+        annotated_lines = self.logic.get_annotated_line_count()
+        self.line_progress.setMaximum(total_lines if total_lines else 1)
+        self.line_progress.setValue(annotated_lines)
+        self.line_progress_label.setText(f"Line Progress: {annotated_lines}/{total_lines}")
+
+    def update_ui_state(self):
         pass
-        
+
+    ###########################################################################
+    # Overridden line/image navigation to show custom alerts
+    ###########################################################################
+    def next_line(self):
+        moved = self.logic.next_line()
+        if not moved:
+            self.show_alert("Please annotate the current line before moving to the next line!")
+        self.refresh_viewer()
+
+    def prev_line(self):
+        moved = self.logic.previous_line()
+        if not moved:
+            self.show_alert("Please annotate the current line before moving to the previous line!")
+        self.refresh_viewer()
+
+    def next_image(self):
+        moved = self.logic.next_image()
+        if not moved:
+            if self.logic.is_current_image_fully_annotated() and \
+               self.logic.current_image_index == self.logic.get_total_images() - 1:
+                self.image_name_label.setText("This is the last image!")
+            else:
+                self.show_alert("Fully annotate lines + environment before proceeding to the next image!")
+            return
+        self.update_image()
+
+    def prev_image(self):
+        moved = self.logic.previous_image()
+        if not moved:
+            self.image_name_label.setText("This is the first image!")
+            return
+        self.update_image()
+
+    def save_annotations(self):
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Annotations",
+            "annotations_result.json",
+            "JSON Files (*.json);;All Files (*)"
+        )
+        if file_path:
+            self.logic.save_annotations(file_path)
+            self.image_name_label.setText(f"Annotations saved to {file_path}")
 
 
+def main():
+    app = QApplication(sys.argv)
+    window = LineAnnotationTool()
+    window.show()
+    sys.exit(app.exec_())   
 
 
 if __name__ == "__main__":
-    import sys
-    app = QApplication(sys.argv)
-    MainWindow  = LineAnnotationTool()
-    #app.setStyleSheet(css)
-    MainWindow.show()
-    sys.exit(app.exec_())
+    main()
